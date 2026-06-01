@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block title %}Pracownicy — {{ app_name }}{% endblock %}
+{% block page_heading %}Pracownicy{% endblock %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Pracownicy</h1>
+            <p class="page-subtitle">Zarządzanie pracownikami i powiązania z MOSYS</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+            <input type="text" id="search-input" placeholder="Szukaj…"
+                   style="padding:.5rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.8125rem;font-family:inherit;background:#fff;outline:none;width:180px;">
+            <button id="sync-btn" onclick="syncMosys()"
+                    style="display:flex;align-items:center;gap:.4rem;padding:.5rem 1rem;background:#1e3a5f;color:#fff;border:none;border-radius:.5rem;font-size:.8125rem;font-weight:500;cursor:pointer;font-family:inherit;">
+                <span class="material-icons" style="font-size:16px;">sync</span>
+                Synchronizuj z MOSYS
+            </button>
+            <button onclick="openAddModal()"
+                    style="padding:.5rem 1rem;background:var(--color-accent);color:#fff;border:none;border-radius:.5rem;font-size:.8125rem;font-weight:500;cursor:pointer;font-family:inherit;">
+                + Dodaj ręcznie
+            </button>
+        </div>
+    </div>
+
+    <!-- Sync status banner -->
+    <div id="sync-banner" style="display:none;padding:.625rem 1rem;border-radius:.5rem;border:1px solid;margin-bottom:.75rem;font-size:.8125rem;"></div>
+
+    <div class="table-container">
+        <div class="table-scroll-wrapper">
+            <div id="loading-state" style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Ładowanie…</div>
+            <div id="empty-state" style="display:none;padding:2rem;text-align:center;color:var(--color-ink-subtle);">
+                Brak pracowników. Kliknij "Synchronizuj z MOSYS" aby zaimportować.
+            </div>
+            <table class="refined-table" id="emp-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th class="no-sort">Nazwisko i imię</th>
+                        <th class="no-sort">Nr pracownika</th>
+                        <th class="no-sort">ID MOSYS</th>
+                        <th class="no-sort">Konto użytkownika</th>
+                        <th class="no-sort"></th>
+                    </tr>
+                </thead>
+                <tbody id="emp-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit modal -->
+<div id="emp-modal" style="display:none;" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="material-icons" style="color:var(--color-accent);">badge</span>
+            <div class="modal-title" id="modal-title">Nowy pracownik</div>
+            <button onclick="closeModal()" style="background:none;border:none;cursor:pointer;opacity:.5;font-size:1.2rem;">✕</button>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:.875rem;">
+            <div id="modal-error" style="display:none;padding:.5rem .75rem;background:#fdf3f3;border:1px solid #f0c8c8;border-radius:.4rem;color:#9b2c2c;font-size:.8rem;"></div>
+            <input type="hidden" id="modal-emp-id">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                <div>
+                    <label style="display:block;font-size:.75rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.25rem;">Nazwisko *</label>
+                    <input type="text" id="modal-last-name"
+                           style="width:100%;padding:.5rem .75rem;border:1px solid var(--color-border);border-radius:.4rem;font-size:.875rem;font-family:inherit;background:#fafafa;outline:none;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:.75rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.25rem;">Imię</label>
+                    <input type="text" id="modal-first-name"
+                           style="width:100%;padding:.5rem .75rem;border:1px solid var(--color-border);border-radius:.4rem;font-size:.875rem;font-family:inherit;background:#fafafa;outline:none;">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                <div>
+                    <label style="display:block;font-size:.75rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.25rem;">Nr pracownika</label>
+                    <input type="text" id="modal-emp-no" placeholder="opcjonalnie"
+                           style="width:100%;padding:.5rem .75rem;border:1px solid var(--color-border);border-radius:.4rem;font-size:.875rem;font-family:inherit;background:#fafafa;outline:none;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:.75rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.25rem;">ID MOSYS (CODICE)</label>
+                    <input type="text" id="modal-mosys-id" placeholder="np. 9042"
+                           style="width:100%;padding:.5rem .75rem;border:1px solid var(--color-border);border-radius:.4rem;font-size:.875rem;font-family:monospace;background:#fafafa;outline:none;">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeModal()" style="padding:.5rem 1rem;border:1px solid var(--color-border);border-radius:.5rem;background:#fff;cursor:pointer;font-family:inherit;">Anuluj</button>
+            <button onclick="submitModal()"
+                    style="padding:.5rem 1rem;background:var(--color-accent);color:#fff;border:none;border-radius:.5rem;cursor:pointer;font-family:inherit;font-weight:500;">
+                Zapisz
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let allEmployees = [];
+
+async function loadEmployees() {
+    const resp = await fetch('{{ url_for("employees.api_list") }}');
+    const data = await resp.json();
+    allEmployees = data.employees || [];
+    renderEmployees(allEmployees);
+}
+
+function renderEmployees(employees) {
+    document.getElementById('loading-state').style.display = 'none';
+    if (!employees.length) {
+        document.getElementById('empty-state').style.display = 'block';
+        document.getElementById('emp-table').style.display = 'none';
+        return;
+    }
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('emp-table').style.display = 'table';
+
+    document.getElementById('emp-body').innerHTML = employees.map(e => {
+        const userBadge = e.user_full_name
+            ? `<span class="badge badge-ok" style="font-size:.65rem;">${escHtml(e.user_full_name)}</span>`
+            : '<span class="badge badge-na" style="font-size:.65rem;">brak</span>';
+        const mosysTag = e.mosys_employee_id
+            ? `<span style="font-family:monospace;font-size:.75rem;background:#f0f9ff;padding:.15rem .4rem;border-radius:.3rem;color:#0369a1;">${escHtml(e.mosys_employee_id)}</span>`
+            : '<span style="color:var(--color-ink-subtle);">—</span>';
+        const deleteBtn = e.user_id ? '' :
+            `<button onclick="deleteEmployee(${e.id}, '${escHtml(e.last_name)}')"
+                     style="padding:.25rem .5rem;font-size:.7rem;border:1px solid #fca5a5;border-radius:.3rem;background:#fff;color:#dc2626;cursor:pointer;">
+                Usuń
+            </button>`;
+
+        return `<tr class="table-row-hover">
+            <td><strong>${escHtml(e.last_name)}</strong>${e.first_name ? ' ' + escHtml(e.first_name) : ''}</td>
+            <td style="color:var(--color-ink-muted);font-size:.8rem;">${e.employee_no ? escHtml(e.employee_no) : '—'}</td>
+            <td>${mosysTag}</td>
+            <td>${userBadge}</td>
+            <td style="text-align:right;display:flex;gap:.4rem;justify-content:flex-end;padding:.4rem 1rem;">
+                <button onclick="openEditModal(${JSON.stringify(e).replace(/"/g,'&quot;')})"
+                        style="padding:.25rem .5rem;font-size:.7rem;border:1px solid var(--color-border);border-radius:.3rem;background:#fff;color:var(--color-ink-muted);cursor:pointer;">
+                    Edytuj
+                </button>
+                ${deleteBtn}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function escHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Sync from MOSYS ── */
+async function syncMosys() {
+    const btn = document.getElementById('sync-btn');
+    const banner = document.getElementById('sync-banner');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px;animation:spin 1s linear infinite;">sync</span> Synchronizuję…';
+
+    try {
+        const resp = await fetch('{{ url_for("employees.api_sync_mosys") }}', { method: 'POST' });
+        const data = await resp.json();
+
+        if (data.success) {
+            banner.style.cssText = 'display:block;background:#f0f9f4;border-color:#c8e8d4;color:#2d6a4f;padding:.625rem 1rem;border-radius:.5rem;border:1px solid;margin-bottom:.75rem;font-size:.8125rem;';
+            banner.textContent = `Synchronizacja zakończona — dodano: ${data.added}, zaktualizowano: ${data.updated}, z MOSYS: ${data.total_mosys}`;
+            loadEmployees();
+        } else {
+            banner.style.cssText = 'display:block;background:#fdf3f3;border-color:#f0c8c8;color:#9b2c2c;padding:.625rem 1rem;border-radius:.5rem;border:1px solid;margin-bottom:.75rem;font-size:.8125rem;';
+            banner.textContent = 'Błąd synchronizacji: ' + (data.error || 'nieznany błąd');
+        }
+    } catch (e) {
+        banner.style.cssText = 'display:block;background:#fdf3f3;border-color:#f0c8c8;color:#9b2c2c;padding:.625rem 1rem;border-radius:.5rem;border:1px solid;margin-bottom:.75rem;font-size:.8125rem;';
+        banner.textContent = 'Błąd połączenia';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px;">sync</span> Synchronizuj z MOSYS';
+}
+
+/* ── Add/Edit modal ── */
+function openAddModal() {
+    document.getElementById('modal-title').textContent = 'Nowy pracownik';
+    document.getElementById('modal-emp-id').value = '';
+    document.getElementById('modal-last-name').value = '';
+    document.getElementById('modal-first-name').value = '';
+    document.getElementById('modal-emp-no').value = '';
+    document.getElementById('modal-mosys-id').value = '';
+    document.getElementById('modal-error').style.display = 'none';
+    document.getElementById('emp-modal').style.display = 'flex';
+}
+
+function openEditModal(emp) {
+    document.getElementById('modal-title').textContent = 'Edytuj pracownika';
+    document.getElementById('modal-emp-id').value = emp.id;
+    document.getElementById('modal-last-name').value = emp.last_name || '';
+    document.getElementById('modal-first-name').value = emp.first_name || '';
+    document.getElementById('modal-emp-no').value = emp.employee_no || '';
+    document.getElementById('modal-mosys-id').value = emp.mosys_employee_id || '';
+    document.getElementById('modal-error').style.display = 'none';
+    document.getElementById('emp-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('emp-modal').style.display = 'none';
+}
+
+async function submitModal() {
+    const errDiv = document.getElementById('modal-error');
+    errDiv.style.display = 'none';
+
+    const payload = {
+        last_name: document.getElementById('modal-last-name').value.trim(),
+        first_name: document.getElementById('modal-first-name').value.trim(),
+        employee_no: document.getElementById('modal-emp-no').value.trim() || null,
+        mosys_employee_id: document.getElementById('modal-mosys-id').value.trim() || null,
+    };
+
+    if (!payload.last_name) {
+        errDiv.textContent = 'Nazwisko jest wymagane';
+        errDiv.style.display = 'block';
+        return;
+    }
+
+    const empId = document.getElementById('modal-emp-id').value;
+    const url = empId ? `/system/employees/api/${empId}` : '{{ url_for("employees.api_create") }}';
+    const method = empId ? 'PUT' : 'POST';
+
+    const resp = await fetch(url, {
+        method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+        closeModal();
+        loadEmployees();
+    } else {
+        errDiv.textContent = data.error || 'Błąd zapisu';
+        errDiv.style.display = 'block';
+    }
+}
+
+async function deleteEmployee(empId, lastName) {
+    if (!confirm(`Usunąć pracownika "${lastName}"?`)) return;
+    const resp = await fetch(`/system/employees/api/${empId}`, { method: 'DELETE' });
+    const data = await resp.json();
+    if (data.success) loadEmployees();
+    else alert(data.error || 'Błąd usuwania');
+}
+
+/* Search */
+document.getElementById('search-input').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    renderEmployees(allEmployees.filter(e =>
+        (e.last_name || '').toLowerCase().includes(q) ||
+        (e.first_name || '').toLowerCase().includes(q) ||
+        (e.mosys_employee_id || '').toLowerCase().includes(q) ||
+        (e.employee_no || '').toLowerCase().includes(q)
+    ));
+});
+
+/* Spinning sync icon */
+const style = document.createElement('style');
+style.textContent = '@keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }';
+document.head.appendChild(style);
+
+loadEmployees();
+</script>
+{% endblock %}

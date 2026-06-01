@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Nowy użytkownik — {{ app_name }}{% endblock %}
+{% block page_heading %}Nowy użytkownik{% endblock %}
+
+{% block content %}
+<div class="refined-page" style="max-width:560px;">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Nowy użytkownik</h1>
+            <p class="page-subtitle">Utwórz konto na podstawie numeru pracownika</p>
+        </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--color-border);border-radius:.75rem;padding:1.5rem;">
+        <div id="error-msg" style="display:none;padding:.625rem .875rem;background:#fdf3f3;border:1px solid #f0c8c8;border-radius:.5rem;color:#9b2c2c;font-size:.8rem;margin-bottom:1rem;"></div>
+
+        <form id="create-form" style="display:flex;flex-direction:column;gap:1rem;">
+            <input type="hidden" id="employee_id" value="">
+
+            <div>
+                <label style="display:block;font-size:.8rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.3rem;">Nr pracownika *</label>
+                <input type="text" id="mosys_employee_id" required autofocus
+                       inputmode="numeric" maxlength="4" placeholder="0000"
+                       style="width:100%;padding:.6rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:1.1rem;font-family:monospace;letter-spacing:.2em;background:#fafafa;outline:none;">
+                <div id="employee-hint" style="margin-top:.3rem;font-size:.75rem;min-height:1.1rem;"></div>
+            </div>
+
+            <div>
+                <label style="display:block;font-size:.8rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.3rem;">Imię i nazwisko</label>
+                <input type="text" id="full_name" readonly
+                       style="width:100%;padding:.6rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;font-family:inherit;background:#f4f4f4;outline:none;color:var(--color-ink);"
+                       placeholder="— zostanie uzupełnione automatycznie —">
+            </div>
+
+            <div>
+                <label style="display:block;font-size:.8rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.3rem;">Rola *</label>
+                <select id="role" required
+                        style="width:100%;padding:.6rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;font-family:inherit;background:#fafafa;outline:none;">
+                    <option value="">— wybierz rolę —</option>
+                    {% for role in roles %}
+                    <option value="{{ role['name'] }}">{{ role['display_name'] }} ({{ role['name'] }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="padding:.625rem .875rem;background:#fdf9ed;border:1px solid #eddcaa;border-radius:.5rem;font-size:.78rem;color:#9a6700;line-height:1.5;">
+                Hasło tymczasowe zostanie wygenerowane automatycznie. Pracownik będzie musiał je zmienić przy pierwszym logowaniu.
+            </div>
+
+            <div style="display:flex;gap:.75rem;margin-top:.5rem;">
+                <button type="submit" id="submit-btn" disabled
+                        style="padding:.65rem 1.25rem;background:var(--color-accent);color:#fff;border:none;border-radius:.5rem;font-size:.875rem;font-weight:500;font-family:inherit;opacity:.45;cursor:default;">
+                    Utwórz użytkownika
+                </button>
+                <a href="{{ url_for('users.users_list') }}"
+                   style="padding:.65rem 1rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;color:var(--color-ink-muted);text-decoration:none;">
+                    Anuluj
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    const _raw = {{ available_employees | tojson }};
+    const EMPLOYEES = {};
+    _raw.forEach(function (e) {
+        if (e.mosys_employee_id) {
+            EMPLOYEES[e.mosys_employee_id] = { db_id: e.id, name: e.first_name + ' ' + e.last_name };
+        }
+    });
+
+    const empInput  = document.getElementById('mosys_employee_id');
+    const nameInput = document.getElementById('full_name');
+    const hintDiv   = document.getElementById('employee-hint');
+    const submitBtn = document.getElementById('submit-btn');
+    const empIdHid  = document.getElementById('employee_id');
+
+    empInput.addEventListener('input', function () {
+        this.value = this.value.replace(/\D/g, '').slice(0, 4);
+        lookupEmployee(this.value);
+    });
+
+    empInput.addEventListener('keydown', function (e) {
+        var nav = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (nav.includes(e.key) || e.ctrlKey || e.metaKey) return;
+        if (!/^\d$/.test(e.key)) e.preventDefault();
+    });
+
+    function lookupEmployee(val) {
+        if (val.length < 4) {
+            nameInput.value = '';
+            empIdHid.value  = '';
+            hintDiv.textContent = '';
+            setSubmit(false);
+            return;
+        }
+        var emp = EMPLOYEES[val];
+        if (emp) {
+            nameInput.value     = emp.name;
+            empIdHid.value      = emp.db_id;
+            hintDiv.textContent = '✓ Pracownik odnaleziony';
+            hintDiv.style.color = '#2d6a4f';
+            setSubmit(true);
+        } else {
+            nameInput.value     = '';
+            empIdHid.value      = '';
+            hintDiv.textContent = '✗ Nie znaleziono pracownika lub konto już istnieje';
+            hintDiv.style.color = '#9b2c2c';
+            setSubmit(false);
+        }
+    }
+
+    function setSubmit(enabled) {
+        submitBtn.disabled      = !enabled;
+        submitBtn.style.opacity = enabled ? '1' : '.45';
+        submitBtn.style.cursor  = enabled ? 'pointer' : 'default';
+    }
+
+    document.getElementById('create-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var errDiv = document.getElementById('error-msg');
+        errDiv.style.display = 'none';
+
+        var mosysId    = empInput.value.trim();
+        var fullName   = nameInput.value.trim();
+        var role       = document.getElementById('role').value;
+        var employeeId = empIdHid.value;
+
+        if (!mosysId || !fullName || !role) {
+            errDiv.textContent = 'Uzupełnij wszystkie pola.';
+            errDiv.style.display = 'block';
+            return;
+        }
+
+        var payload = {
+            mosys_employee_id: mosysId,
+            full_name: fullName,
+            role: role,
+            employee_id: employeeId ? parseInt(employeeId, 10) : null,
+        };
+
+        var resp = await fetch('{{ url_for("users.api_create") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        var data = await resp.json();
+        if (data.success) {
+            window.location.href = '{{ url_for("users.users_list") }}';
+        } else {
+            errDiv.textContent = data.error || 'Błąd tworzenia użytkownika.';
+            errDiv.style.display = 'block';
+        }
+    });
+})();
+</script>
+{% endblock %}

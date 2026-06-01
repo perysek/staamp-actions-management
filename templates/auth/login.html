@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pl" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logowanie — {{ app_name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+    <style>
+        :root {
+            --color-accent: #c9a227;
+            --color-border: #e8e6e1;
+            --color-ink: #1a1a1a;
+            --color-ink-muted: #525252;
+            --color-ink-subtle: #8a8a8a;
+            --color-surface-warm: #f7f6f3;
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        html { zoom: 1.4; }
+        html, body { height: 100%; margin: 0; font-family: 'Inter', sans-serif; background: var(--color-surface-warm); color: var(--color-ink); font-size: .875rem; }
+        .login-card { background: #fff; border: 1px solid var(--color-border); border-radius: 1rem; padding: 2.5rem; box-shadow: 0 4px 24px rgba(0,0,0,.06); }
+        label { display: block; font-size: .8rem; font-weight: 500; color: var(--color-ink-muted); margin-bottom: .35rem; }
+        input[type=text], input[type=password] {
+            width: 100%; padding: .625rem .875rem; border: 1px solid var(--color-border);
+            border-radius: .5rem; font-size: .875rem; font-family: inherit;
+            background: #fafafa; outline: none; transition: border-color .15s, box-shadow .15s;
+        }
+        input[type=text]:focus, input[type=password]:focus {
+            border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(201,162,39,.15);
+        }
+        .btn-primary {
+            width: 100%; padding: .7rem 1rem; background: var(--color-accent); color: #fff;
+            border: none; border-radius: .5rem; font-size: .875rem; font-weight: 500;
+            cursor: pointer; transition: opacity .15s; font-family: inherit;
+        }
+        .btn-primary:hover { opacity: .9; }
+        .flash { display: flex; align-items: center; gap: .5rem; padding: .625rem .875rem;
+                 border-radius: .5rem; font-size: .8rem; border: 1px solid; margin-bottom: 1rem; }
+        .flash-error   { background: #fdf3f3; border-color: #f0c8c8; color: #9b2c2c; }
+        .flash-warning { background: #fdf9ed; border-color: #eddcaa; color: #9a6700; }
+        .flash-info    { background: #f2f6fd; border-color: #c5d8f5; color: #1e6091; }
+        .flash-success { background: #f0f9f4; border-color: #c8e8d4; color: #2d6a4f; }
+        .emp-id-input  { letter-spacing:.2em; font-family:monospace; font-size:1.1rem !important; }
+    </style>
+</head>
+<body class="h-full flex items-center justify-center">
+<div style="max-width:400px;width:100%;margin:0 1rem;">
+
+    <div style="text-align:center;margin-bottom:1.5rem;">
+        <span class="material-icons" style="color:var(--color-accent);font-size:32px;">qr_code_scanner</span>
+        <div style="font-size:1.25rem;font-weight:600;margin-top:.5rem;">{{ app_name }}</div>
+        <div style="font-size:.8rem;color:var(--color-ink-subtle);margin-top:.2rem;">Sensor Cover Quality Control</div>
+    </div>
+
+    <div class="login-card">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">
+                <span class="material-icons" style="font-size:16px;">
+                    {% if category == 'error' %}error{% elif category == 'warning' %}warning{% elif category == 'success' %}check_circle{% else %}info{% endif %}
+                </span>
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endwith %}
+
+        <!-- ── Regular login form ─────────────────────────────── -->
+        <form id="login-form" method="POST" action="{{ url_for('auth.login') }}"
+              style="display:flex;flex-direction:column;gap:1.1rem;">
+            <div>
+                <label for="employee_id">Nr pracownika</label>
+                <input type="text" id="employee_id" name="employee_id"
+                       value="{{ employee_id or '' }}" required autofocus
+                       autocomplete="off" inputmode="numeric" maxlength="4"
+                       placeholder="0000" class="emp-id-input"
+                       list="employees-list">
+                <datalist id="employees-list">
+                    {% for emp in login_employees %}
+                    <option value="{{ emp['mosys_employee_id'] }}">{{ emp['full_name'] }}</option>
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div id="password-section" style="display:flex;flex-direction:column;gap:1.1rem;">
+                <div>
+                    <label for="password">Hasło</label>
+                    <input type="password" id="password" name="password" required placeholder="••••••••">
+                </div>
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                    <input type="checkbox" id="remember" name="remember" style="accent-color:var(--color-accent);">
+                    <label for="remember" style="margin:0;font-weight:400;color:var(--color-ink-subtle);">Zapamiętaj mnie</label>
+                </div>
+                <button type="submit" class="btn-primary">Zaloguj się</button>
+            </div>
+        </form>
+
+        <!-- ── First-login form (hidden until needs-setup detected) ── -->
+        <form id="first-login-form" method="POST" action="{{ url_for('auth.first_login') }}"
+              style="display:none;flex-direction:column;gap:1.1rem;">
+            <input type="hidden" name="mosys_id" id="fl-mosys-id">
+
+            <div style="display:flex;align-items:center;gap:.625rem;padding:.75rem .875rem;
+                        background:#f2f6fd;border:1px solid #c5d8f5;border-radius:.5rem;">
+                <span class="material-icons" style="font-size:18px;color:#1e6091;">person</span>
+                <div>
+                    <div style="font-size:.75rem;color:#1e6091;">Pierwsze logowanie</div>
+                    <div id="fl-name" style="font-size:.875rem;font-weight:500;color:var(--color-ink);"></div>
+                </div>
+            </div>
+
+            <div>
+                <label for="fl-new-password">Nowe hasło</label>
+                <input type="password" id="fl-new-password" name="new_password" required
+                       minlength="8" placeholder="min. 8 znaków">
+            </div>
+            <div>
+                <label for="fl-confirm-password">Potwierdź hasło</label>
+                <input type="password" id="fl-confirm-password" name="confirm_password" required
+                       placeholder="••••••••">
+            </div>
+            <div id="fl-error" style="display:none;font-size:.8rem;color:#9b2c2c;"></div>
+            <button type="submit" class="btn-primary">Ustaw hasło i zaloguj</button>
+            <button type="button" id="fl-back-btn"
+                    style="width:100%;padding:.55rem 1rem;background:none;border:1px solid var(--color-border);
+                           border-radius:.5rem;font-size:.8rem;color:var(--color-ink-muted);cursor:pointer;
+                           font-family:inherit;">
+                ← Wróć do logowania
+            </button>
+        </form>
+
+        <div style="text-align:center;margin-top:.75rem;display:flex;align-items:center;justify-content:center;gap:1rem;">
+            <a href="{{ url_for('auth.forgot_password') }}"
+               style="font-size:.75rem;color:var(--color-ink-subtle);text-decoration:none;">
+                Nie pamiętam hasła
+            </a>
+            <span style="color:var(--color-border);">|</span>
+            <a href="{{ url_for('main.manual_logowanie') }}"
+               target="_blank"
+               style="font-size:.75rem;color:var(--color-ink-subtle);text-decoration:none;display:inline-flex;align-items:center;gap:.25rem;">
+                <span class="material-icons" style="font-size:13px;">menu_book</span>
+                Instrukcja logowania
+            </a>
+        </div>
+    </div>
+
+    <div style="text-align:center;margin-top:1.5rem;font-size:.65rem;color:var(--color-ink-subtle);">
+        &copy; {{ now().year }} {{ app_name }} — wewnętrzne narzędzie produkcyjne
+    </div>
+</div>
+<script>
+(function () {
+    var empInput   = document.getElementById('employee_id');
+    var pwInput    = document.getElementById('password');
+    var loginForm  = document.getElementById('login-form');
+    var flForm     = document.getElementById('first-login-form');
+    var flMosysId  = document.getElementById('fl-mosys-id');
+    var flName     = document.getElementById('fl-name');
+    var flNewPw    = document.getElementById('fl-new-password');
+    var flConfirm  = document.getElementById('fl-confirm-password');
+    var flError    = document.getElementById('fl-error');
+    var flBack     = document.getElementById('fl-back-btn');
+
+    // ── digit-only input ──────────────────────────────────────
+    empInput.addEventListener('keydown', function (e) {
+        var nav = ['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'];
+        if (nav.includes(e.key) || e.ctrlKey || e.metaKey) return;
+        if (!/^\d$/.test(e.key)) e.preventDefault();
+    });
+
+    empInput.addEventListener('input', function () {
+        this.value = this.value.replace(/\D/g, '').slice(0, 4);
+        if (this.value.length === 4) {
+            checkSetupNeeded(this.value);
+        } else {
+            showRegularLogin(false);
+        }
+    });
+
+    // ── setup-check ───────────────────────────────────────────
+    async function checkSetupNeeded(mosysId) {
+        try {
+            var resp = await fetch('/auth/api/needs-setup?mosys_id=' + encodeURIComponent(mosysId));
+            var data = await resp.json();
+            if (data.needs_setup) {
+                switchToFirstLogin(mosysId, data.full_name);
+            } else {
+                showRegularLogin(true);
+            }
+        } catch (_) {
+            showRegularLogin(true);
+        }
+    }
+
+    function switchToFirstLogin(mosysId, fullName) {
+        flMosysId.value = mosysId;
+        flName.textContent = fullName || ('Nr ' + mosysId);
+        flError.style.display = 'none';
+        flNewPw.value = '';
+        flConfirm.value = '';
+        loginForm.style.display = 'none';
+        flForm.style.display = 'flex';
+        flNewPw.focus();
+    }
+
+    function showRegularLogin(focusPw) {
+        loginForm.style.display = 'flex';
+        flForm.style.display = 'none';
+        if (focusPw) pwInput.focus();
+    }
+
+    // ── back button ───────────────────────────────────────────
+    flBack.addEventListener('click', function () {
+        empInput.value = '';
+        showRegularLogin(false);
+        empInput.focus();
+    });
+
+    // ── client-side validation for first-login form ───────────
+    flForm.addEventListener('submit', function (e) {
+        var np = flNewPw.value;
+        var cp = flConfirm.value;
+        flError.style.display = 'none';
+        if (np.length < 8) {
+            e.preventDefault();
+            flError.textContent = 'Hasło musi mieć co najmniej 8 znaków.';
+            flError.style.display = 'block';
+            flNewPw.focus();
+            return;
+        }
+        if (np !== cp) {
+            e.preventDefault();
+            flError.textContent = 'Hasła nie są identyczne.';
+            flError.style.display = 'block';
+            flConfirm.focus();
+        }
+    });
+})();
+</script>
+</body>
+</html>

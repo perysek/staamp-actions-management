@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Edytuj użytkownika — {{ app_name }}{% endblock %}
+{% block page_heading %}Edytuj użytkownika{% endblock %}
+
+{% block content %}
+<div class="refined-page" style="max-width:560px;">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">{{ user['full_name'] }}</h1>
+            <p class="page-subtitle">Edycja konta użytkownika</p>
+        </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--color-border);border-radius:.75rem;padding:1.5rem;">
+        <div id="error-msg" style="display:none;padding:.625rem .875rem;background:#fdf3f3;border:1px solid #f0c8c8;border-radius:.5rem;color:#9b2c2c;font-size:.8rem;margin-bottom:1rem;"></div>
+
+        <form id="edit-form" style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+                <label style="display:block;font-size:.8rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.3rem;">Imię i nazwisko *</label>
+                <input type="text" id="full_name" value="{{ user['full_name'] }}" required
+                       style="width:100%;padding:.6rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;font-family:inherit;background:#fafafa;outline:none;">
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                <div>
+                    <label style="display:block;font-size:.8rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.3rem;">Rola *</label>
+                    <select id="role" required
+                            style="width:100%;padding:.6rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;font-family:inherit;background:#fafafa;outline:none;">
+                        {% for role in roles %}
+                        <option value="{{ role['name'] }}" {% if role['name'] == user['role'] %}selected{% endif %}>
+                            {{ role['display_name'] }} ({{ role['name'] }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:.8rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.3rem;">Powiązany pracownik</label>
+                    <select id="employee_id"
+                            style="width:100%;padding:.6rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;font-family:inherit;background:#fafafa;outline:none;">
+                        <option value="">— brak —</option>
+                        {% if current_employee %}
+                        <option value="{{ current_employee['id'] }}" selected>{% if current_employee['mosys_employee_id'] %}{{ current_employee['mosys_employee_id'] }} — {% endif %}{{ current_employee['first_name'] }} {{ current_employee['last_name'] }}</option>
+                        {% endif %}
+                        {% for emp in available_employees %}
+                        <option value="{{ emp['id'] }}">{% if emp['mosys_employee_id'] %}{{ emp['mosys_employee_id'] }} — {% endif %}{{ emp['first_name'] }} {{ emp['last_name'] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:.625rem;">
+                <input type="checkbox" id="is_active" {% if user['is_active'] %}checked{% endif %}
+                       style="accent-color:var(--color-accent);width:16px;height:16px;">
+                <label for="is_active" style="font-size:.875rem;color:var(--color-ink-muted);margin:0;">Konto aktywne</label>
+            </div>
+
+            <div style="display:flex;gap:.75rem;margin-top:.5rem;">
+                <button type="submit"
+                        style="padding:.65rem 1.25rem;background:var(--color-accent);color:#fff;border:none;border-radius:.5rem;font-size:.875rem;font-weight:500;cursor:pointer;font-family:inherit;">
+                    Zapisz zmiany
+                </button>
+                <a href="{{ url_for('users.users_list') }}"
+                   style="padding:.65rem 1rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;color:var(--color-ink-muted);text-decoration:none;">
+                    Anuluj
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const userId = {{ user['id'] }};
+document.getElementById('edit-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const errDiv = document.getElementById('error-msg');
+    errDiv.style.display = 'none';
+
+    const payload = {
+        full_name: document.getElementById('full_name').value.trim(),
+        role: document.getElementById('role').value,
+        is_active: document.getElementById('is_active').checked,
+        employee_id: document.getElementById('employee_id').value || null,
+    };
+
+    const resp = await fetch(`/system/users/api/${userId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.success) {
+        window.location.href = '{{ url_for("users.users_list") }}';
+    } else {
+        errDiv.textContent = data.error || 'Błąd aktualizacji.';
+        errDiv.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}

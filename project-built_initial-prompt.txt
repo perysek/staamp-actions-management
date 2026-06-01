@@ -1,0 +1,23 @@
+Create implementation plan for building a company internal software for managing tasks, projects, actions.
+
+Requirements:
+
+#1
+Each item must have possibility to define subtasks with definition of: responsible user (choosed from assigned users with is_active=True), start date, finish date, statu, prev/next subtask dependency (i.e. "cannot be started if prev-subtask is not completed", "can start in paralel" etc.) + other common datamodel fields.
+
+#2
+the main task/project/action/goal can be displayed in time-line view showing sub-tasks as a from-to-bar lines with resposible user tagging. The time-line view must show vertical indication of current time (now, localtime).
+
+#3
+GUI
+UI behavior, UX and page-vew templates, css, js files must follow @GUI-GOLDEN-BOOK.md
+
+#4
+User auth and RBAC must follow rules defined in @FLASK-RBAC-GOLDEN-BOOK.md (roles, permissions, users feed is only as examples - adjust to current project use-case). IMPORTANT: user auth and methods for first-login, password-reset must be exactly as specified in this file (authentication based on MOSYS_ID).
+
+#5
+Use current folders and files as starting point. Check all .py files if the code matches the project scope, Adjust/Add/Remove/Modify if otherwise (these files are copy-paste from different project and are supposed to have integrity issues and other errors - be careful, but try to avoid deletions if possible).
+
+
+The plan must be precise and include all details, so that no clarifying questions to user are needed in the fresh new claude code session, unless there are key decisions that only user can make or has explicit knowledge.
+

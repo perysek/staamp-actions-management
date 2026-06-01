@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html { font-family: 'Inter', sans-serif; }
+}
+
+@layer components {
+    /* ── Buttons ── */
+    .btn-refined {
+        @apply inline-flex items-center gap-1.5 cursor-pointer transition-all duration-200;
+        padding: 0.5rem 0.875rem;
+        font-size: 0.75rem; font-weight: 400; letter-spacing: 0.02em;
+        border-radius: 2px;
+    }
+    .btn-refined-primary {
+        @apply btn-refined text-white border-0;
+        background: var(--color-ink);
+    }
+    .btn-refined-primary:hover {
+        background: var(--color-ink-muted);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    }
+    .btn-refined-secondary {
+        @apply btn-refined bg-white border;
+        color: var(--color-ink); border-color: var(--color-border);
+    }
+    .btn-refined-secondary:hover {
+        border-color: var(--color-ink-muted); background: var(--color-surface);
+    }
+    .btn-refined-ghost {
+        @apply btn-refined border-0;
+        background: transparent; color: var(--color-ink-muted); padding: 0.5rem;
+    }
+    .btn-refined-ghost:hover { color: var(--color-ink); background: var(--color-surface); }
+
+    /* ── Table action buttons ── */
+    .table-action-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+        transition: all 0.18s ease; gap: 4px; text-decoration: none; border: 1px solid;
+    }
+    .table-action-btn-view, .table-action-btn-edit { color: #4472c4; border-color: #4472c4; background: transparent; }
+    .table-action-btn-view:hover, .table-action-btn-edit:hover { background: #4472c4; color: #fff; }
+    .table-action-btn-delete { color: #dc3545; border-color: #dc3545; background: transparent; }
+    .table-action-btn-delete:hover { background: #dc3545; color: #fff; }
+
+    /* ── Table row hover ── */
+    .table-row-hover:hover { background-color: #f8fafc; }
+
+    /* ── Skeleton ── */
+    .skeleton {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        border-radius: 4px;
+    }
+    @keyframes shimmer { 0%{ background-position:200% 0 } 100%{ background-position:-200% 0 } }
+}

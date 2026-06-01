@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Użytkownicy — {{ app_name }}{% endblock %}
+{% block page_heading %}Użytkownicy{% endblock %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Użytkownicy</h1>
+            <p class="page-subtitle">Zarządzanie kontami użytkowników systemu</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+            <input type="text" id="search-input" placeholder="Szukaj…"
+                   style="padding:.5rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.8125rem;font-family:inherit;background:#fff;outline:none;width:200px;">
+            <a href="{{ url_for('users.create_user') }}"
+               style="padding:.5rem 1rem;background:var(--color-accent);color:#fff;border-radius:.5rem;font-size:.8125rem;font-weight:500;text-decoration:none;white-space:nowrap;">
+                + Nowy użytkownik
+            </a>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <div class="table-scroll-wrapper">
+            <div id="loading-state" style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Ładowanie…</div>
+            <div id="empty-state" style="display:none;padding:2rem;text-align:center;color:var(--color-ink-subtle);">Brak użytkowników</div>
+            <table class="refined-table" id="users-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th class="no-sort">Imię i nazwisko</th>
+                        <th class="no-sort">Rola</th>
+                        <th class="no-sort">Nr prac.</th>
+                        <th class="no-sort">Status</th>
+                        <th class="no-sort">Ostatnie logowanie</th>
+                        <th class="no-sort"></th>
+                    </tr>
+                </thead>
+                <tbody id="users-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Reset password modal -->
+<div id="reset-pw-modal" style="display:none;" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="material-icons" style="color:var(--color-warning);">lock_reset</span>
+            <div class="modal-title">Reset hasła</div>
+            <button onclick="closeResetPwModal()" style="background:none;border:none;cursor:pointer;opacity:.5;font-size:1.2rem;">✕</button>
+        </div>
+        <div class="modal-body">
+            <p>Ustawiasz nowe hasło dla: <strong id="reset-user-name"></strong></p>
+            <div id="reset-error" style="display:none;padding:.5rem .75rem;background:#fdf3f3;border:1px solid #f0c8c8;border-radius:.4rem;color:#9b2c2c;font-size:.8rem;margin:.5rem 0;"></div>
+            <input type="password" id="reset-password" placeholder="Nowe hasło (min. 8 znaków)"
+                   style="width:100%;padding:.6rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;font-family:inherit;background:#fafafa;outline:none;margin-top:.5rem;">
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeResetPwModal()" style="padding:.5rem 1rem;border:1px solid var(--color-border);border-radius:.5rem;background:#fff;cursor:pointer;font-family:inherit;">Anuluj</button>
+            <button onclick="submitResetPassword()"
+                    style="padding:.5rem 1rem;background:var(--color-accent);color:#fff;border:none;border-radius:.5rem;cursor:pointer;font-family:inherit;font-weight:500;">
+                Ustaw hasło
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let allUsers = [];
+let resetUserId = null;
+
+async function loadUsers() {
+    const resp = await fetch('{{ url_for("users.api_list") }}');
+    const data = await resp.json();
+    allUsers = data.users || [];
+    renderUsers(allUsers);
+}
+
+function renderUsers(users) {
+    document.getElementById('loading-state').style.display = 'none';
+    if (!users.length) {
+        document.getElementById('empty-state').style.display = 'block';
+        document.getElementById('users-table').style.display = 'none';
+        return;
+    }
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('users-table').style.display = 'table';
+
+    document.getElementById('users-body').innerHTML = users.map(u => {
+        const roleBadge = u.role === 'superuser'
+            ? `<span class="badge" style="background:#fef3c7;color:#92400e;">${escHtml(u.role)}</span>`
+            : `<span class="badge badge-na">${escHtml(u.role)}</span>`;
+        const statusBadge = u.is_active
+            ? '<span class="badge badge-ok">Aktywny</span>'
+            : '<span class="badge badge-nok">Nieaktywny</span>';
+        const lastLogin = u.last_login ? new Date(u.last_login).toLocaleString('pl-PL') : '—';
+        const toggleLabel = u.is_active ? 'Dezaktywuj' : 'Aktywuj';
+        const toggleStyle = u.is_active
+            ? 'padding:.3rem .6rem;font-size:.75rem;border:1px solid #fca5a5;border-radius:.35rem;background:#fff;color:#dc2626;cursor:pointer;'
+            : 'padding:.3rem .6rem;font-size:.75rem;border:1px solid #86efac;border-radius:.35rem;background:#fff;color:#16a34a;cursor:pointer;';
+
+        return `<tr class="table-row-hover">
+            <td><strong>${escHtml(u.full_name)}</strong></td>
+            <td>${roleBadge}</td>
+            <td style="font-family:monospace;color:var(--color-ink-muted);">${escHtml(u.employee_mosys_id || '—')}</td>
+            <td>${statusBadge}</td>
+            <td style="color:var(--color-ink-subtle);">${lastLogin}</td>
+            <td style="text-align:right;display:flex;gap:.4rem;justify-content:flex-end;padding:.5rem 1rem;">
+                <a href="/system/users/${u.id}/edit"
+                   style="padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--color-border);border-radius:.35rem;background:#fff;color:var(--color-ink-muted);text-decoration:none;">
+                   Edytuj
+                </a>
+                <button onclick="toggleActive(${u.id})" style="${toggleStyle}">${toggleLabel}</button>
+                <button onclick="openResetPwModal(${u.id}, '${escHtml(u.full_name)}')"
+                        style="padding:.3rem .6rem;font-size:.75rem;border:1px solid #bfdbfe;border-radius:.35rem;background:#fff;color:#1d4ed8;cursor:pointer;">
+                    Reset hasła
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function escHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function toggleActive(userId) {
+    const resp = await fetch(`/system/users/api/${userId}/toggle-active`, { method: 'PUT' });
+    const data = await resp.json();
+    if (data.success) loadUsers();
+    else alert(data.error || 'Błąd');
+}
+
+function openResetPwModal(userId, userName) {
+    resetUserId = userId;
+    document.getElementById('reset-user-name').textContent = userName;
+    document.getElementById('reset-password').value = '';
+    document.getElementById('reset-error').style.display = 'none';
+    document.getElementById('reset-pw-modal').style.display = 'flex';
+}
+
+function closeResetPwModal() {
+    document.getElementById('reset-pw-modal').style.display = 'none';
+    resetUserId = null;
+}
+
+async function submitResetPassword() {
+    const password = document.getElementById('reset-password').value;
+    const errDiv = document.getElementById('reset-error');
+    if (password.length < 8) {
+        errDiv.textContent = 'Hasło musi mieć co najmniej 8 znaków';
+        errDiv.style.display = 'block';
+        return;
+    }
+    const resp = await fetch(`/system/users/api/${resetUserId}/reset-password`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ password }),
+    });
+    const data = await resp.json();
+    if (data.success) {
+        closeResetPwModal();
+    } else {
+        errDiv.textContent = data.error || 'Błąd';
+        errDiv.style.display = 'block';
+    }
+}
+
+document.getElementById('search-input').addEventListener('input', function () {
+    const q = this.value.toLowerCase();
+    renderUsers(allUsers.filter(u =>
+        u.full_name.toLowerCase().includes(q) ||
+        u.role.toLowerCase().includes(q) ||
+        (u.employee_mosys_id || '').includes(q)
+    ));
+});
+
+loadUsers();
+</script>
+{% endblock %}

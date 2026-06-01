@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pl" class="h-full">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}DMC Validator{% endblock %}</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+
+    <!-- TailwindCSS (compiled output) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}" />
+
+    {% block extra_head %}{% endblock %}
+
+    <style>
+        /* ── Design Tokens ─────────────────────────────────── */
+        :root {
+            --font-body: 'Inter', sans-serif;
+            --color-ink:          #1a1a1a;
+            --color-ink-muted:    #525252;
+            --color-ink-subtle:   #8a8a8a;
+            --color-surface:      #fafafa;
+            --color-surface-warm: #f7f6f3;
+            --color-border:       #e8e6e1;
+            --color-border-subtle:#f0eeea;
+            --color-accent:       #c9a227;
+            --color-accent-muted: rgba(201,162,39,0.12);
+            --color-success:      #2d6a4f;
+            --color-warning:      #9a6700;
+            --color-error:        #9b2c2c;
+            --color-info:         #1e6091;
+            --color-info-bg:      #eff6ff;
+            --color-info-border:  #bfdbfe;
+            --color-info-text:    #1e40af;
+            --sidebar-bg:         #0f172a;
+            --sidebar-bg-deep:    #162032;
+            --sidebar-text:       #94a3b8;
+            --sidebar-text-hover: #ffffff;
+            --sidebar-text-active:#60a5fa;
+            --sidebar-active-bg:  rgba(37,99,235,0.2);
+            --sidebar-active-border:#60a5fa;
+            --sidebar-border:     rgba(51,65,85,0.5);
+            --sidebar-hover-bg:   #1e293b;
+            --ease-out-expo:  cubic-bezier(0.16,1,0.3,1);
+            --ease-out-quart: cubic-bezier(0.25,1,0.5,1);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body { font-family: var(--font-body); background: var(--color-surface-warm); color: var(--color-ink); font-size: 0.875rem; font-weight: 400; }
+
+        /* ── Skip link ─── */
+        .skip-link { position: absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
+        .skip-link:focus { left:0; top:0; width:auto; height:auto; padding:0.5rem 1rem; background:#fff; z-index:10000; }
+
+        /* ── Layout ─── */
+        .app-shell { display:flex; height:100vh; overflow:hidden; }
+        .sidebar { width:295px; display:flex; flex-direction:column; flex-shrink:0; background:var(--sidebar-bg); box-shadow:4px 0 24px rgba(0,0,0,.35); z-index:100; transition:transform .38s var(--ease-out-expo); }
+        .main-col { flex:1; display:flex; flex-direction:column; min-width:0; overflow:hidden; }
+        .app-header { display:flex; align-items:center; gap:1rem; padding:.625rem 1.25rem; background:#fff; border-bottom:1px solid var(--color-border); min-height:52px; flex-shrink:0; }
+        .app-main { flex:1; overflow-y:auto; overflow-x:hidden; }
+        .app-footer { background:rgba(255,255,255,.5); border-top:1px solid #e2e8f0; padding:.5rem 1.5rem; text-align:center; font-size:.75rem; color:#64748b; flex-shrink:0; }
+
+        /* ── Sidebar internals ─── */
+        .sidebar-logo { padding:1.25rem 1rem .75rem; border-bottom:1px solid var(--sidebar-border); }
+        .sidebar-logo-title { font-size:1.08rem; font-weight:700; color:#fff; letter-spacing:.04em; }
+        .sidebar-logo-sub   { font-size:.78rem; color:var(--sidebar-text); margin-top:.1rem; }
+        .sidebar-nav { flex:1; padding:.5rem 0; overflow-y:auto; }
+        .sidebar-section-label { font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.14em; color:#475569; padding:.75rem 1rem .25rem; }
+        .sidebar-link { display:flex; align-items:center; gap:.625rem; padding:.5rem 1rem; font-size:.975rem; font-weight:400; color:var(--sidebar-text); text-decoration:none; border-left:3px solid transparent; transition:all .23s ease; }
+        .sidebar-link:hover { background:var(--sidebar-hover-bg); color:var(--sidebar-text-hover); }
+        .sidebar-link.active { background:var(--sidebar-active-bg); color:var(--sidebar-text-active); border-left-color:var(--sidebar-active-border); font-weight:500; }
+        .sidebar-link .material-icons { font-size:22px; }
+        .sidebar-footer { padding:.75rem 1rem; border-top:1px solid var(--sidebar-border); background:var(--sidebar-bg-deep); font-size:.9rem; color:var(--sidebar-text); }
+
+        /* ── Page layout classes ─── */
+        .refined-page { padding:1rem 1.5rem; display:flex; flex-direction:column; height:100%; }
+        .page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1rem; gap:1rem; }
+        .page-title { font-size:1.25rem; font-weight:600; color:var(--color-ink); line-height:1.2; }
+        .page-subtitle { font-size:.8125rem; font-weight:300; color:var(--color-ink-muted); margin-top:.2rem; }
+        .stat-value { font-size:1.25rem; font-weight:600; }
+        .stat-label { font-size:.6875rem; font-weight:500; text-transform:uppercase; letter-spacing:.08em; color:var(--color-ink-subtle); }
+
+        /* ── Buttons ─── */
+        .btn-press:active { transform:scale(0.97); transition:transform 125ms ease-out; }
+        .hover-lift:hover { transform:translateY(-2px); box-shadow:0 4px 16px rgba(0,0,0,.1); transition:all .25s var(--ease-out-expo); }
+
+        /* ── Tables ─── */
+        .table-container { flex:1; display:flex; flex-direction:column; overflow:hidden; border:1px solid var(--color-border); border-radius:.75rem; background:#fff; }
+        .table-scroll-wrapper { overflow:auto; flex:1; }
+        .refined-table { width:100%; border-collapse:collapse; }
+        .refined-table thead th { font-size:.6875rem; font-weight:500; text-transform:uppercase; letter-spacing:.12em; color:var(--color-ink-subtle); padding:.625rem 1rem; border-bottom:1px solid var(--color-border); text-align:left; white-space:nowrap; position:sticky; top:0; background:#fff; z-index:1; cursor:pointer; user-select:none; }
+        .refined-table thead th.no-sort { cursor:default; }
+        .refined-table tbody td { font-size:.8125rem; font-weight:300; padding:.625rem 1rem; border-bottom:1px solid var(--color-border-subtle); vertical-align:middle; }
+        .refined-table tbody tr:last-child td { border-bottom:none; }
+        .table-row-hover:hover { background:#f8fafc; }
+        .sort-icon { font-size:.65rem; margin-left:.25rem; opacity:.5; }
+
+        /* ── Badges ─── */
+        .badge { display:inline-flex; align-items:center; gap:.25rem; padding:.2rem .6rem; border-radius:9999px; font-size:.6875rem; font-weight:500; }
+        .badge-ok  { background:#dcfce7; color:#15803d; }
+        .badge-nok { background:#fee2e2; color:#dc2626; }
+        .badge-na  { background:#f1f5f9; color:#64748b; }
+
+        /* ── Animations ─── */
+        @keyframes fade-up { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes fade-in  { from { opacity:0; } to { opacity:1; } }
+        @keyframes scale-in { from { opacity:0; transform:scale(.95); } to { opacity:1; transform:scale(1); } }
+        @keyframes toast-slide-up { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-5px)} 40%,80%{transform:translateX(5px)} }
+        @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(45,106,79,.4)} 70%{box-shadow:0 0 0 8px rgba(45,106,79,0)} 100%{box-shadow:0 0 0 0 rgba(45,106,79,0)} }
+
+        .animate-fade-up   { animation:fade-up .44s var(--ease-out-expo) both; }
+        .animate-fade-in   { animation:fade-in .31s ease both; }
+        .animate-scale-in  { animation:scale-in .28s var(--ease-out-expo) both; }
+        .error-shake       { animation:shake .5s ease-in-out; }
+        .success-pulse     { animation:pulse-ring .88s ease-out; }
+
+        .stagger-item:nth-child(1)  { animation-delay:.03s }
+        .stagger-item:nth-child(2)  { animation-delay:.06s }
+        .stagger-item:nth-child(3)  { animation-delay:.09s }
+        .stagger-item:nth-child(4)  { animation-delay:.12s }
+        .stagger-item:nth-child(5)  { animation-delay:.15s }
+        .stagger-item:nth-child(6)  { animation-delay:.18s }
+        .stagger-item:nth-child(7)  { animation-delay:.21s }
+        .stagger-item:nth-child(8)  { animation-delay:.24s }
+        .stagger-item:nth-child(9)  { animation-delay:.27s }
+        .stagger-item:nth-child(10) { animation-delay:.30s }
+
+        /* ── Toast notifications ─── */
+        #toast-container { position:fixed; bottom:1.25rem; right:1.25rem; display:flex; flex-direction:column; gap:.5rem; z-index:9000; pointer-events:none; }
+        .toast { display:flex; align-items:flex-start; gap:.625rem; padding:.75rem 1rem; border-radius:.5rem; border:1px solid; font-size:.8125rem; font-weight:400; min-width:260px; max-width:380px; box-shadow:0 4px 16px rgba(0,0,0,.12); animation:toast-slide-up .23s var(--ease-out-expo) both; pointer-events:all; cursor:default; transition:box-shadow .19s ease; border-left-width:4px; }
+        .toast:hover { box-shadow:0 6px 24px rgba(0,0,0,.16); }
+        .toast-success { background:#f0f9f4; border-color:#c8e8d4; color:var(--color-success); }
+        .toast-error   { background:#fdf3f3; border-color:#f0c8c8; color:var(--color-error); }
+        .toast-warning { background:#fdf9ed; border-color:#eddcaa; color:var(--color-warning); }
+        .toast-info    { background:#f2f6fd; border-color:#c5d8f5; color:var(--color-info); }
+        .toast-close   { margin-left:auto; background:none; border:none; cursor:pointer; opacity:.5; font-size:1rem; padding:0; color:inherit; }
+        .toast-close:hover { opacity:1; }
+
+        /* ── Modal ─── */
+        .modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:9999; padding:1rem; }
+        .modal-content { background:#fff; border-radius:1rem; max-width:480px; width:100%; max-height:calc(100vh - 2rem); display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.2); animation:scale-in .22s var(--ease-out-expo) both; }
+        .modal-header { display:flex; align-items:center; gap:.75rem; padding:1.25rem 1.5rem 1rem; border-bottom:1px solid var(--color-border); }
+        .modal-title  { font-size:1rem; font-weight:600; flex:1; }
+        .modal-body   { padding:1.25rem 1.5rem; overflow-y:auto; font-size:.875rem; line-height:1.6; color:var(--color-ink-muted); }
+        .modal-footer { display:flex; justify-content:flex-end; gap:.625rem; padding:1rem 1.5rem; border-top:1px solid var(--color-border); background:#f8fafc; border-radius:0 0 1rem 1rem; }
+
+        /* ── Scrollbar ─── */
+        .scrollbar-thin::-webkit-scrollbar { width:8px; height:8px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background:#f1f5f9; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:4px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover { background:#94a3b8; }
+
+        /* ── Mobile sidebar overlay ─── */
+        #sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:99; }
+        #sidebar-overlay.open { display:block; }
+        @media (max-width:1023px) {
+            .sidebar { position:fixed; left:0; top:0; height:100vh; transform:translateX(-100%); }
+            .sidebar.open { transform:translateX(0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="h-full">
+<a href="#main-content" class="skip-link">Przejdź do treści</a>
+
+<!-- Mobile sidebar overlay -->
+<div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<div class="app-shell">
+    <!-- ═══ SIDEBAR ═════════════════════════════════════════════ -->
+    <aside class="sidebar" id="sidebar" role="navigation" aria-label="Nawigacja główna">
+        <!-- Logo -->
+        <div class="sidebar-logo">
+            <div class="flex items-center gap-2">
+                <span class="material-icons" style="color:var(--color-accent);font-size:26px;">qr_code_scanner</span>
+                <div>
+                    <div class="sidebar-logo-title">DMC Validator</div>
+                    <div class="sidebar-logo-sub">Sensor Cover Quality</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Nav -->
+        <nav class="sidebar-nav scrollbar-thin">
+            {% if user_permissions.dmc_validation %}
+            <div class="sidebar-section-label">Weryfikacja</div>
+            <a href="{{ url_for('main.index') }}"
+               class="sidebar-link {% if request.endpoint == 'main.index' %}active{% endif %}"
+               {% if request.endpoint == 'main.index' %}aria-current="page"{% endif %}>
+                <span class="material-icons">qr_code_2</span>
+                Skaner DMC
+            </a>
+            {% endif %}
+            {% if user_permissions.history %}
+            <a href="{{ url_for('main.history') }}"
+               class="sidebar-link {% if request.endpoint == 'main.history' %}active{% endif %}"
+               {% if request.endpoint == 'main.history' %}aria-current="page"{% endif %}>
+                <span class="material-icons">history</span>
+                Historia skanów
+            </a>
+            {% endif %}
+
+            {% if current_user.is_authenticated %}
+            <div class="sidebar-section-label" style="margin-top:.5rem;">Dokumentacja</div>
+            <a href="{{ url_for('main.help_page') }}"
+               class="sidebar-link {% if request.endpoint == 'main.help_page' %}active{% endif %}"
+               {% if request.endpoint == 'main.help_page' %}aria-current="page"{% endif %}>
+                <span class="material-icons">help_outline</span>
+                Specyfikacja techniczna
+            </a>
+            <a href="{{ url_for('main.operator_card') }}"
+               class="sidebar-link {% if request.endpoint == 'main.operator_card' %}active{% endif %}"
+               {% if request.endpoint == 'main.operator_card' %}aria-current="page"{% endif %}>
+                <span class="material-icons">assignment</span>
+                Instrukcja dla kontroli
+            </a>
+            {% endif %}
+
+            {% if current_user.is_authenticated and current_user.role == 'superuser' %}
+            <div class="sidebar-section-label" style="margin-top:.5rem;">System</div>
+            <a href="{{ url_for('users.users_list') }}"
+               class="sidebar-link {% if request.blueprint == 'users' %}active{% endif %}">
+                <span class="material-icons">manage_accounts</span>
+                Użytkownicy
+            </a>
+            <a href="{{ url_for('employees.employees_list') }}"
+               class="sidebar-link {% if request.blueprint == 'employees' %}active{% endif %}">
+                <span class="material-icons">badge</span>
+                Pracownicy
+            </a>
+            <a href="{{ url_for('roles.roles_list') }}"
+               class="sidebar-link {% if request.blueprint == 'roles' %}active{% endif %}">
+                <span class="material-icons">admin_panel_settings</span>
+                Role i uprawnienia
+            </a>
+            {% endif %}
+            {% if user_permissions.audit %}
+            <a href="{{ url_for('audit.audit_list') }}"
+               class="sidebar-link {% if request.blueprint == 'audit' %}active{% endif %}">
+                <span class="material-icons">manage_search</span>
+                Dziennik zdarzeń
+            </a>
+            {% endif %}
+        </nav>
+
+        <!-- Footer -->
+        <div class="sidebar-footer">
+            {% if current_user.is_authenticated %}
+            {% if current_mosys_employee_id %}
+            <div style="color:#94a3b8;font-size:.72rem;font-family:monospace;margin-bottom:.15rem;">ID {{ current_mosys_employee_id }}</div>
+            {% endif %}
+            <div style="font-weight:500;color:#cbd5e1;margin-bottom:.2rem;font-size:.9rem;">{{ current_user.full_name }}</div>
+            <div style="color:#475569;font-size:.78rem;">{{ current_user.role }}</div>
+            <a href="{{ url_for('auth.logout') }}" style="display:inline-flex;align-items:center;gap:.3rem;margin-top:.5rem;font-size:.84rem;color:#64748b;text-decoration:none;">
+                <span class="material-icons" style="font-size:17px;">logout</span>Wyloguj
+            </a>
+            {% else %}
+            <div class="text-xs" style="color:#475569;">v{{ app_version }} — DMC Validator</div>
+            {% endif %}
+        </div>
+    </aside>
+
+    <!-- ═══ MAIN COLUMN ══════════════════════════════════════════ -->
+    <div class="main-col">
+        <!-- Header -->
+        <header class="app-header">
+            <!-- Mobile menu toggle -->
+            <button class="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg hover:bg-slate-100 transition-colors"
+                    onclick="toggleSidebar()" aria-label="Otwórz menu">
+                <span class="material-icons text-slate-600" style="font-size:20px;">menu</span>
+            </button>
+
+            <div class="flex-1 min-w-0">
+                <h2 class="text-sm font-medium text-slate-700 truncate">{% block page_heading %}{% endblock %}</h2>
+            </div>
+
+            <div class="flex items-center gap-2">
+                {% block page_actions %}{% endblock %}
+            </div>
+        </header>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="px-4 pt-3 space-y-2">
+            {% for category, message in messages %}
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl border text-sm
+                {% if category == 'success' %}bg-green-50 border-green-200 text-green-800
+                {% elif category == 'error' %}bg-red-50 border-red-200 text-red-800
+                {% elif category == 'warning' %}bg-amber-50 border-amber-200 text-amber-800
+                {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}"
+                 role="alert">
+                <span class="material-icons text-base">
+                    {% if category == 'success' %}check_circle{% elif category == 'error' %}error{% elif category == 'warning' %}warning{% else %}info{% endif %}
+                </span>
+                <span class="flex-1">{{ message }}</span>
+                <button onclick="this.parentElement.remove()" class="opacity-50 hover:opacity-100 transition-opacity" aria-label="Zamknij">
+                    <span class="material-icons text-base">close</span>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Main content -->
+        <main class="app-main scrollbar-thin" id="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="app-footer">
+            &copy; {{ now().year }} Sensor Cover DMC Validator — wewnętrzne narzędzie produkcyjne
+        </footer>
+    </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Core JS -->
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+<script src="{{ url_for('static', filename='js/modals.js') }}"></script>
+<script src="{{ url_for('static', filename='js/table-utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/searchable-select.js') }}"></script>
+<script src="{{ url_for('static', filename='js/keyboard-shortcuts.js') }}"></script>
+
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('open');
+}
+</script>
+
+{% block scripts %}{% endblock %}
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

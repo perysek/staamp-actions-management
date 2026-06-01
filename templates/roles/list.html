@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Role — {{ app_name }}{% endblock %}
+{% block page_heading %}Role i uprawnienia{% endblock %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Role</h1>
+            <p class="page-subtitle">Zarządzanie rolami i uprawnieniami do modułów</p>
+        </div>
+        <a href="{{ url_for('roles.create_role') }}"
+           style="padding:.5rem 1rem;background:var(--color-accent);color:#fff;border-radius:.5rem;font-size:.8125rem;font-weight:500;text-decoration:none;white-space:nowrap;">
+            + Nowa rola
+        </a>
+    </div>
+
+    <div class="table-container">
+        <div class="table-scroll-wrapper">
+            <div id="loading-state" style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Ładowanie…</div>
+            <table class="refined-table" id="roles-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th class="no-sort">Nazwa systemowa</th>
+                        <th class="no-sort">Wyświetlana nazwa</th>
+                        <th class="no-sort">Dostęp do modułów</th>
+                        <th class="no-sort">Typ</th>
+                        <th class="no-sort"></th>
+                    </tr>
+                </thead>
+                <tbody id="roles-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const MODULE_LABELS = {
+    dmc_validation: 'Skaner DMC',
+    history: 'Historia',
+    admin: 'Administracja',
+    audit: 'Dziennik zdarzeń',
+    manual_mode: 'Tryb manualny',
+    tryb_korekty: 'Tryb korekty',
+};
+
+async function loadRoles() {
+    const resp = await fetch('{{ url_for("roles.api_list") }}');
+    const data = await resp.json();
+    renderRoles(data.roles || []);
+}
+
+function renderRoles(roles) {
+    document.getElementById('loading-state').style.display = 'none';
+    const table = document.getElementById('roles-table');
+    table.style.display = 'table';
+
+    document.getElementById('roles-body').innerHTML = roles.map(r => {
+        const moduleDots = Object.entries(r.permissions).map(([mod, on]) =>
+            `<span title="${MODULE_LABELS[mod] || mod}"
+                   style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;
+                   background:${on ? '#22c55e' : '#d1d5db'};cursor:default;"></span>`
+        ).join('');
+
+        const protectedBadge = r.is_protected
+            ? '<span class="badge badge-na" style="font-size:.65rem;">Systemowa</span>' : '';
+        const deleteBtn = r.is_protected ? '' :
+            `<button onclick="deleteRole(${r.id}, '${r.display_name.replace("'","")}')"
+                     style="padding:.3rem .6rem;font-size:.75rem;border:1px solid #fca5a5;border-radius:.35rem;background:#fff;color:#dc2626;cursor:pointer;">
+                Usuń
+            </button>`;
+
+        return `<tr class="table-row-hover">
+            <td style="font-family:monospace;font-size:.8rem;">${r.name}</td>
+            <td><strong>${r.display_name}</strong></td>
+            <td style="padding:.6rem 1rem;">${moduleDots}</td>
+            <td>${protectedBadge}</td>
+            <td style="text-align:right;display:flex;gap:.4rem;justify-content:flex-end;padding:.5rem 1rem;">
+                <a href="/system/roles/${r.id}/edit"
+                   style="padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--color-border);border-radius:.35rem;background:#fff;color:var(--color-ink-muted);text-decoration:none;">
+                    Edytuj uprawnienia
+                </a>
+                ${deleteBtn}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function deleteRole(roleId, displayName) {
+    if (!confirm(`Usunąć rolę "${displayName}"? Użytkownicy z tą rolą utracą dostęp.`)) return;
+    const resp = await fetch(`/system/roles/api/${roleId}`, { method: 'DELETE' });
+    const data = await resp.json();
+    if (data.success) loadRoles();
+    else alert(data.error || 'Błąd usuwania roli');
+}
+
+loadRoles();
+</script>
+{% endblock %}
