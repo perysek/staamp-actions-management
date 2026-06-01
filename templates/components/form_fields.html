@@ -1,0 +1,67 @@
+{# ── Form field macros — System A (2px radius, font-weight 300) ──────────────
+   Styling classes (.ff-*) are defined in base.html's shell <style> block. #}
+
+{% macro text_input(name, label, value='', required=False, placeholder='', type='text', id='') %}
+<div class="ff-group">
+    <label class="ff-label" for="{{ id or name }}">
+        {{ label }}{% if required %} <span class="ff-req">*</span>{% endif %}
+    </label>
+    <input class="ff-input" type="{{ type }}" id="{{ id or name }}" name="{{ name }}"
+           value="{{ value if value is not none else '' }}"
+           placeholder="{{ placeholder }}"{% if required %} required{% endif %} />
+</div>
+{% endmacro %}
+
+{% macro textarea_input(name, label, value='', required=False, placeholder='', rows=4, id='') %}
+<div class="ff-group">
+    <label class="ff-label" for="{{ id or name }}">
+        {{ label }}{% if required %} <span class="ff-req">*</span>{% endif %}
+    </label>
+    <textarea class="ff-textarea" id="{{ id or name }}" name="{{ name }}" rows="{{ rows }}"
+              placeholder="{{ placeholder }}"{% if required %} required{% endif %}>{{ value if value is not none else '' }}</textarea>
+</div>
+{% endmacro %}
+
+{% macro date_input(name, label, value='', required=False, id='') %}
+<div class="ff-group">
+    <label class="ff-label" for="{{ id or name }}">
+        {{ label }}{% if required %} <span class="ff-req">*</span>{% endif %}
+    </label>
+    <input class="ff-input" type="date" id="{{ id or name }}" name="{{ name }}"
+           value="{{ value if value is not none else '' }}"{% if required %} required{% endif %} />
+</div>
+{% endmacro %}
+
+{# options = list of (value, label) tuples #}
+{% macro select_input(name, label, options, value='', required=False, id='') %}
+<div class="ff-group">
+    <label class="ff-label" for="{{ id or name }}">
+        {{ label }}{% if required %} <span class="ff-req">*</span>{% endif %}
+    </label>
+    <select class="ff-select" id="{{ id or name }}" name="{{ name }}"{% if required %} required{% endif %}>
+        {% for opt_value, opt_label in options %}
+        <option value="{{ opt_value }}"{% if opt_value == value %} selected{% endif %}>{{ opt_label }}</option>
+        {% endfor %}
+    </select>
+</div>
+{% endmacro %}
+
+{% macro form_section(title, icon='', description='') %}
+<div class="ff-section">
+    {% if title %}
+    <div class="ff-section-title">
+        {% if icon %}<span class="material-icons" style="font-size:18px;color:var(--color-accent);">{{ icon }}</span>{% endif %}
+        {{ title }}
+    </div>
+    {% endif %}
+    {% if description %}<div class="ff-section-desc">{{ description }}</div>{% endif %}
+    {{ caller() }}
+</div>
+{% endmacro %}
+
+{% macro form_actions(submit_label='Zapisz', cancel_url='', cancel_label='Anuluj', submit_id='') %}
+<div class="ff-actions">
+    {% if cancel_url %}<a href="{{ cancel_url }}" class="ff-btn ff-btn-secondary btn-press">{{ cancel_label }}</a>{% endif %}
+    <button type="submit" class="ff-btn ff-btn-primary btn-press"{% if submit_id %} id="{{ submit_id }}"{% endif %}>{{ submit_label }}</button>
+</div>
+{% endmacro %}

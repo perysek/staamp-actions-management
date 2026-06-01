@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "components/form_fields.html" import text_input, textarea_input, date_input, select_input, form_section, form_actions %}
+{% block title %}Edytuj działanie — {{ app_name }}{% endblock %}
+{% block page_heading %}Edytuj działanie{% endblock %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Edytuj działanie</h1>
+            <p class="page-subtitle">{{ item['title'] }}</p>
+        </div>
+    </div>
+
+    <form id="item-form" style="max-width:720px;">
+        {% call form_section('Szczegóły', 'edit_note') %}
+            {{ text_input('title', 'Tytuł', value=item['title'], required=True) }}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                {{ select_input('item_type', 'Typ', item_type_options, value=item['item_type'], required=True) }}
+                {{ select_input('status', 'Status', item_status_options, value=item['status'], required=True) }}
+            </div>
+            {{ date_input('due_date', 'Termin', value=item['due_date'] or '') }}
+            {{ textarea_input('description', 'Opis', value=item['description'] or '', rows=5) }}
+        {% endcall %}
+
+        {% call form_section('Odpowiedzialni', 'group', 'Zaznacz osoby odpowiedzialne za to działanie.') %}
+            {% if active_users %}
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.4rem;">
+                {% for u in active_users %}
+                <label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border:1px solid var(--color-border);border-radius:2px;font-size:.8125rem;font-weight:300;cursor:pointer;">
+                    <input type="checkbox" class="resp-check" value="{{ u['id'] }}"
+                           {% if u['id'] in responsible_ids %}checked{% endif %}> {{ u['full_name'] }}
+                </label>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="color:var(--color-ink-subtle);font-size:.8125rem;">Brak aktywnych użytkowników.</div>
+            {% endif %}
+        {% endcall %}
+
+        {{ form_actions('Zapisz zmiany', cancel_url=url_for('items.items_list')) }}
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('item-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const title = document.getElementById('title').value.trim();
+    if (!title) { Notifications.error('Tytuł jest wymagany'); return; }
+    const responsibles = [...document.querySelectorAll('.resp-check:checked')].map(c => parseInt(c.value));
+    const payload = {
+        title,
+        item_type: document.getElementById('item_type').value,
+        status: document.getElementById('status').value,
+        due_date: document.getElementById('due_date').value || null,
+        description: document.getElementById('description').value || null,
+        responsibles,
+    };
+    const resp = await fetch('{{ url_for("items.api_update", item_id=item["id"]) }}', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.success) { window.location.href = `/items/{{ item["id"] }}`; }
+    else Notifications.error(data.error || 'Błąd zapisu');
+});
+</script>
+{% endblock %}

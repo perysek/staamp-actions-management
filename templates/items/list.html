@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Działania — {{ app_name }}{% endblock %}
+{% block page_heading %}Działania{% endblock %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Działania</h1>
+            <p class="page-subtitle">Zadania, projekty, działania i cele</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+            <input type="text" id="search-input" placeholder="Szukaj…"
+                   style="padding:.5rem .875rem;border:1px solid var(--color-border);border-radius:2px;font-size:.8125rem;font-family:inherit;background:#fff;outline:none;width:200px;">
+            {% if current_user.role in ['superuser', 'manager'] %}
+            <a href="{{ url_for('items.create_item') }}" class="ff-btn ff-btn-primary btn-press">+ Nowe działanie</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="table-container">
+        <div class="table-scroll-wrapper">
+            <div id="loading-state" style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Ładowanie…</div>
+            <div id="empty-state" style="display:none;padding:2rem;text-align:center;color:var(--color-ink-subtle);">Brak działań</div>
+            <table class="refined-table" id="items-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th class="no-sort">Typ</th>
+                        <th class="no-sort">Tytuł</th>
+                        <th class="no-sort">Status</th>
+                        <th class="no-sort">Termin</th>
+                        <th class="no-sort">Odpowiedzialni</th>
+                        <th class="no-sort">Podzadania</th>
+                        <th class="no-sort"></th>
+                    </tr>
+                </thead>
+                <tbody id="items-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const canManage = {{ 'true' if current_user.role in ['superuser', 'manager'] else 'false' }};
+
+const TYPE_LABELS = { task:'Zadanie', project:'Projekt', action:'Działanie', goal:'Cel' };
+const STATUS_LABELS = { open:'Otwarte', in_progress:'W toku', on_hold:'Wstrzymane', done:'Zakończone', cancelled:'Anulowane' };
+const STATUS_BADGE = {
+    open:        'background:#eff6ff;color:#1e40af;',
+    in_progress: 'background:#fef9ed;color:#9a6700;',
+    on_hold:     'background:#f1f5f9;color:#475569;',
+    done:        'background:#dcfce7;color:#15803d;',
+    cancelled:   'background:#f1f5f9;color:#94a3b8;',
+};
+
+let allItems = [];
+
+function escHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function loadItems() {
+    const resp = await fetch('{{ url_for("items.api_list") }}');
+    const data = await resp.json();
+    allItems = data.items || [];
+    renderItems(allItems);
+}
+
+function renderItems(items) {
+    document.getElementById('loading-state').style.display = 'none';
+    if (!items.length) {
+        document.getElementById('empty-state').style.display = 'block';
+        document.getElementById('items-table').style.display = 'none';
+        return;
+    }
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('items-table').style.display = 'table';
+
+    document.getElementById('items-body').innerHTML = items.map(it => {
+        const statusBadge = `<span class="badge" style="${STATUS_BADGE[it.status] || ''}">${escHtml(STATUS_LABELS[it.status] || it.status)}</span>`;
+        const typeLabel = escHtml(TYPE_LABELS[it.item_type] || it.item_type);
+        const due = it.due_date ? `<span style="font-family:monospace;">${escHtml(it.due_date)}</span>` : '<span style="color:var(--color-ink-subtle);">—</span>';
+        const resp = it.responsibles ? escHtml(it.responsibles) : '<span style="color:var(--color-ink-subtle);">—</span>';
+        let actions = `<a href="/items/${it.id}" style="padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;">Szczegóły</a>`;
+        if (canManage) {
+            actions += ` <a href="/items/${it.id}/edit" style="padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;">Edytuj</a>`;
+            actions += ` <button onclick="deleteItem(${it.id}, '${escHtml(it.title).replace(/'/g, "\\'")}')" style="padding:.3rem .6rem;font-size:.75rem;border:1px solid #fca5a5;border-radius:2px;background:#fff;color:#dc2626;cursor:pointer;">Usuń</button>`;
+        }
+        return `<tr class="table-row-hover">
+            <td>${typeLabel}</td>
+            <td><strong><a href="/items/${it.id}" style="color:var(--color-ink);text-decoration:none;">${escHtml(it.title)}</a></strong></td>
+            <td>${statusBadge}</td>
+            <td>${due}</td>
+            <td style="color:var(--color-ink-muted);">${resp}</td>
+            <td style="text-align:center;">${it.subtask_count}</td>
+            <td style="text-align:right;white-space:nowrap;padding:.5rem 1rem;">${actions}</td>
+        </tr>`;
+    }).join('');
+}
+
+function deleteItem(id, title) {
+    Modals.confirm({
+        title: 'Usuń działanie',
+        message: `Czy na pewno usunąć „${title}”? Wszystkie podzadania zostaną usunięte.`,
+        confirmText: 'Usuń', cancelText: 'Anuluj', type: 'danger',
+        onConfirm: async () => {
+            const resp = await fetch(`/items/api/${id}`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) { Notifications.success('Usunięto działanie'); loadItems(); }
+            else Notifications.error(data.error || 'Błąd usuwania');
+        },
+    });
+}
+
+document.getElementById('search-input').addEventListener('input', function () {
+    const q = this.value.toLowerCase();
+    renderItems(allItems.filter(it =>
+        (it.title || '').toLowerCase().includes(q) ||
+        (STATUS_LABELS[it.status] || '').toLowerCase().includes(q) ||
+        (it.responsibles || '').toLowerCase().includes(q)
+    ));
+});
+
+loadItems();
+</script>
+{% endblock %}

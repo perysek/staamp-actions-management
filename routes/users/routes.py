@@ -83,8 +83,8 @@ def api_list():
 @role_required('superuser')
 def api_create():
     data = request.get_json() or {}
-    mosys_employee_id = data.get('mosys_employee_id', '').strip()
-    full_name = data.get('full_name', '').strip()
+    mosys_employee_id = (data.get('mosys_employee_id') or '').strip()
+    full_name = (data.get('full_name') or '').strip()
     role = data.get('role', '')
     employee_id = data.get('employee_id')
 
@@ -122,7 +122,7 @@ def api_update(user_id: int):
         return jsonify({'success': False, 'error': 'Nie możesz edytować konta właściciela'}), 403
 
     data = request.get_json() or {}
-    full_name = data.get('full_name', '').strip()
+    full_name = (data.get('full_name') or '').strip()
     role = data.get('role', '')
     is_active = bool(data.get('is_active', True))
     employee_id = data.get('employee_id')

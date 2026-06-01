@@ -1,15 +1,19 @@
 from typing import Any, Optional
 from database.db import get_connection
 
-ALL_MODULES = ['dmc_validation', 'history', 'admin', 'audit', 'manual_mode', 'tryb_korekty']
+ALL_MODULES = ['actions', 'timeline', 'admin', 'audit']
+ALL_FLAGS = ['actions_view_assigned_only', 'subtasks_update_assigned_only']
 
 MODULE_DISPLAY_NAMES = {
-    'dmc_validation': 'Skaner DMC',
-    'history':        'Historia skanów',
-    'admin':          'Administracja',
-    'audit':          'Dziennik zdarzeń',
-    'manual_mode':    'Tryb manualny',
-    'tryb_korekty':   'Tryb korekty',
+    'actions':  'Działania',
+    'timeline': 'Oś czasu',
+    'admin':    'Administracja',
+    'audit':    'Dziennik zdarzeń',
+}
+
+FLAG_DISPLAY_NAMES = {
+    'actions_view_assigned_only':    'Widok: tylko pozycje z moim podzadaniem',
+    'subtasks_update_assigned_only': 'Edycja: tylko moje podzadania (status)',
 }
 
 
@@ -55,23 +59,23 @@ class RoleRepository:
             return cursor.rowcount > 0
 
     def get_permissions(self, role_id: int) -> dict:
-        """Returns {module: bool} for all known modules (missing ones default to False)."""
+        """Returns {module/flag: bool} for all known modules AND flags (missing → False)."""
         with get_connection() as conn:
             rows = conn.execute(
                 "SELECT module_name, has_access FROM role_permissions WHERE role_id = ?",
                 (role_id,),
             ).fetchall()
         db_perms = {row['module_name']: bool(row['has_access']) for row in rows}
-        return {m: db_perms.get(m, False) for m in ALL_MODULES}
+        return {key: db_perms.get(key, False) for key in (ALL_MODULES + ALL_FLAGS)}
 
     def set_permissions(self, role_id: int, permissions: dict):
-        """Upsert permissions for all known modules."""
+        """Upsert permissions for all known modules and flags (same table)."""
         with get_connection() as conn:
-            for module in ALL_MODULES:
+            for key in (ALL_MODULES + ALL_FLAGS):
                 conn.execute(
                     """INSERT INTO role_permissions (role_id, module_name, has_access) VALUES (?, ?, ?)
                        ON CONFLICT (role_id, module_name) DO UPDATE SET has_access = excluded.has_access""",
-                    (role_id, module, int(bool(permissions.get(module, False)))),
+                    (role_id, key, int(bool(permissions.get(key, False)))),
                 )
 
     def role_has_module_access(self, role_name: str, module_name: str) -> bool:
@@ -88,8 +92,19 @@ class RoleRepository:
             return role_name in MODULE_PERMISSIONS.get(module_name, [])
         return bool(row['has_access'])
 
+    def role_has_flag(self, role_name: str, flag: str) -> bool:
+        """Returns whether a role has a toggleable flag enabled. Default False on absence."""
+        query = """
+            SELECT rp.has_access FROM role_permissions rp
+            JOIN roles r ON r.id = rp.role_id
+            WHERE r.name = ? AND rp.module_name = ?
+        """
+        with get_connection() as conn:
+            row = conn.execute(query, (role_name, flag)).fetchone()
+        return bool(row['has_access']) if row else False
+
     def get_user_module_permissions(self, role_name: str) -> dict:
-        """Returns {module_name: bool} — used by context processor."""
+        """Returns {module_name: bool} for sidebar gating — used by context processor."""
         query = """
             SELECT rp.module_name, rp.has_access FROM role_permissions rp
             JOIN roles r ON r.id = rp.role_id WHERE r.name = ?

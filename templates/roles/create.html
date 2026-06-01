@@ -63,6 +63,24 @@
                 {% endfor %}
             </div>
 
+            {% if all_flags %}
+            <div>
+                <div style="font-size:.8rem;font-weight:600;color:var(--color-ink);margin-bottom:.5rem;">Ograniczenia</div>
+                {% for flag in all_flags %}
+                <div class="module-row">
+                    <div>
+                        <div style="font-size:.875rem;font-weight:500;">{{ flag_display_names[flag] }}</div>
+                        <div style="font-size:.7rem;color:var(--color-ink-subtle);font-family:monospace;">{{ flag }}</div>
+                    </div>
+                    <label class="toggle">
+                        <input type="checkbox" name="flag_{{ flag }}" id="perm_{{ flag }}">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
             <div style="display:flex;gap:.75rem;margin-top:.5rem;">
                 <button type="submit"
                         style="padding:.65rem 1.25rem;background:var(--color-accent);color:#fff;border:none;border-radius:.5rem;font-size:.875rem;font-weight:500;cursor:pointer;font-family:inherit;">
@@ -81,6 +99,7 @@
 {% block extra_scripts %}
 <script>
 const allModules = {{ all_modules | tojson }};
+const allFlags = {{ all_flags | tojson }};
 
 document.getElementById('create-form').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -88,8 +107,8 @@ document.getElementById('create-form').addEventListener('submit', async function
     errDiv.style.display = 'none';
 
     const permissions = {};
-    allModules.forEach(m => {
-        permissions[m] = document.getElementById('perm_' + m).checked;
+    allModules.concat(allFlags).forEach(key => {
+        permissions[key] = document.getElementById('perm_' + key).checked;
     });
 
     const payload = {

@@ -45,10 +45,10 @@ def api_list():
 @role_required('superuser')
 def api_create():
     data = request.get_json() or {}
-    first_name = data.get('first_name', '').strip()
-    last_name = data.get('last_name', '').strip()
-    employee_no = data.get('employee_no', '').strip() or None
-    mosys_id = data.get('mosys_employee_id', '').strip() or None
+    first_name = (data.get('first_name') or '').strip()
+    last_name = (data.get('last_name') or '').strip()
+    employee_no = (data.get('employee_no') or '').strip() or None
+    mosys_id = (data.get('mosys_employee_id') or '').strip() or None
 
     if not last_name:
         return jsonify({'success': False, 'error': 'Nazwisko jest wymagane'}), 400
@@ -70,10 +70,10 @@ def api_create():
 @role_required('superuser')
 def api_update(employee_id: int):
     data = request.get_json() or {}
-    first_name = data.get('first_name', '').strip()
-    last_name = data.get('last_name', '').strip()
-    employee_no = data.get('employee_no', '').strip() or None
-    mosys_id = data.get('mosys_employee_id', '').strip() or None
+    first_name = (data.get('first_name') or '').strip()
+    last_name = (data.get('last_name') or '').strip()
+    employee_no = (data.get('employee_no') or '').strip() or None
+    mosys_id = (data.get('mosys_employee_id') or '').strip() or None
 
     if not last_name:
         return jsonify({'success': False, 'error': 'Nazwisko jest wymagane'}), 400

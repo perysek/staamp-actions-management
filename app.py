@@ -32,17 +32,23 @@ def create_app() -> Flask:
             return None
 
     # Blueprints
-    # TODO: to add new BP imports/registers as per project scope
-
     from routes.auth.routes import auth_bp
     from routes.users.routes import users_bp
     from routes.roles.routes import roles_bp
     from routes.employees.routes import employees_bp
-   
+    from routes.main_routes import main_bp
+    from routes.items.routes import items_bp
+    from routes.timeline.routes import timeline_bp
+    from routes.audit.routes import audit_bp
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(roles_bp)
     app.register_blueprint(employees_bp)
+    app.register_blueprint(main_bp)
+    app.register_blueprint(items_bp)
+    app.register_blueprint(timeline_bp)
+    app.register_blueprint(audit_bp)
 
     @app.context_processor
     def inject_globals():

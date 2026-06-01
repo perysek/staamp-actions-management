@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Dziennik zdarzeń — {{ app_name }}{% endblock %}
+{% block page_heading %}Dziennik zdarzeń{% endblock %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Dziennik zdarzeń</h1>
+            <p class="page-subtitle">Ostatnie zdarzenia systemowe (do 500)</p>
+        </div>
+        <input type="text" id="search-input" placeholder="Szukaj…"
+               style="padding:.5rem .875rem;border:1px solid var(--color-border);border-radius:2px;font-size:.8125rem;font-family:inherit;background:#fff;outline:none;width:220px;">
+    </div>
+
+    <div class="table-container">
+        <div class="table-scroll-wrapper">
+            {% if events %}
+            <table class="refined-table" id="audit-table">
+                <thead>
+                    <tr>
+                        <th class="no-sort">Czas</th>
+                        <th class="no-sort">Zdarzenie</th>
+                        <th class="no-sort">Użytkownik</th>
+                        <th class="no-sort">Szczegóły</th>
+                        <th class="no-sort">IP</th>
+                    </tr>
+                </thead>
+                <tbody id="audit-body">
+                    {% for e in events %}
+                    <tr class="table-row-hover">
+                        <td style="font-family:monospace;color:var(--color-ink-muted);white-space:nowrap;">{{ e.occurred_at }}</td>
+                        <td><span class="badge {{ e.badge_class }}">{{ e.label }}</span></td>
+                        <td>{{ e.user_name or e.user_email or '—' }}</td>
+                        <td style="color:var(--color-ink-muted);">{{ e.detail or '—' }}</td>
+                        <td style="font-family:monospace;color:var(--color-ink-subtle);">{{ e.ip_address or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Brak zdarzeń</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const searchInput = document.getElementById('search-input');
+if (searchInput) {
+    searchInput.addEventListener('input', function () {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('#audit-body tr').forEach(tr => {
+            tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+}
+</script>
+{% endblock %}

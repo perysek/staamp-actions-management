@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% block title %}Oś czasu — {{ item['title'] }} — {{ app_name }}{% endblock %}
+{% block page_heading %}Oś czasu{% endblock %}
+
+{% block extra_css %}
+<style>
+    #gantt-wrap { overflow:auto; border:1px solid var(--color-border); border-radius:.5rem; background:#fff; flex:1; }
+    #gantt { position:relative; }
+    .g-axis { position:sticky; top:0; z-index:6; background:#fff; border-bottom:1px solid var(--color-border); }
+    .g-tick { position:absolute; top:0; font-size:.65rem; color:var(--color-ink-subtle); padding:.25rem .2rem; border-left:1px solid var(--color-border-subtle); white-space:nowrap; }
+    .g-tick.major { color:var(--color-ink); font-weight:600; border-left-color:var(--color-border); }
+    .g-row { position:relative; border-bottom:1px solid var(--color-border-subtle); }
+    /* One sticky wrapper holds BOTH label columns as flex children — keeps them side-by-side and aligned to rows. */
+    .g-labelwrap { position:sticky; left:0; z-index:5; background:#fff; display:flex; box-sizing:border-box; border-right:1px solid var(--color-border); }
+    .g-lc { display:flex; align-items:center; padding:0 .6rem; box-sizing:border-box; overflow:hidden; font-size:.78rem; }
+    .g-lc-resp { border-left:1px solid var(--color-border-subtle); color:var(--color-ink-muted); }
+    .g-title-clamp { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.2; white-space:normal; overflow-wrap:break-word; word-break:normal; }
+    .g-bar { position:absolute; border-radius:2px; box-shadow:0 1px 2px rgba(0,0,0,.15); }
+    #g-nowline { position:absolute; top:0; width:2px; background:#dc2626; z-index:4; pointer-events:none; }
+    #g-nowlabel { position:absolute; top:0; transform:translateX(-50%); background:#dc2626; color:#fff; font-size:.62rem; padding:.1rem .35rem; border-radius:2px; white-space:nowrap; z-index:5; }
+    #g-deps { position:absolute; top:0; left:0; z-index:1; pointer-events:none; }
+    .g-toggle { display:inline-flex; border:1px solid var(--color-border); border-radius:2px; overflow:hidden; }
+    .g-toggle button { border:none; border-left:1px solid var(--color-border); background:#fff; padding:.4rem .75rem; font-size:.75rem; cursor:pointer; font-family:inherit; color:var(--color-ink-muted); }
+    .g-toggle button:first-child { border-left:none; }
+    .g-toggle button.active { background:var(--color-accent); color:#fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">{{ item['title'] }}</h1>
+            <p class="page-subtitle">Wykres Gantta podzadań · <span id="g-clock" style="font-family:monospace;"></span></p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+            <div class="g-toggle" id="g-unit-toggle">
+                <button data-unit="days">Dni</button>
+                <button data-unit="weeks">Tygodnie</button>
+                <button data-unit="months">Miesiące</button>
+            </div>
+            <a href="{{ url_for('items.item_detail', item_id=item['id']) }}" class="ff-btn ff-btn-secondary btn-press">
+                <span class="material-icons" style="font-size:17px;">arrow_back</span> Szczegóły
+            </a>
+        </div>
+    </div>
+
+    <div id="g-empty" style="display:none;padding:2rem;text-align:center;color:var(--color-ink-subtle);">
+        Brak podzadań z datami do wyświetlenia na osi czasu.
+    </div>
+    <div id="gantt-wrap" class="scrollbar-thin"><div id="gantt"></div></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const ITEM_ID = {{ item['id'] }};
+const CAN_MANAGE = {{ can_manage|tojson }};
+const ACTIVE_USERS = [{% for u in active_users %}{ id: {{ u['id'] }}, name: {{ u['full_name']|tojson }} },{% endfor %}];
+const EDIT_CURSOR = CAN_MANAGE ? 'cursor:pointer;' : '';
+
+// Layout constants (sized for the +20% text)
+const ROW_H = 52, BAR_H = 20, AXIS_H = 40;
+const LABEL_TITLE_W = 270, LABEL_RESP_W = 170, LABEL_W = LABEL_TITLE_W + LABEL_RESP_W;
+// pixels-per-day per unit — each chosen so one tick is as narrow as stays readable
+const PXDAY = { days: 28, weeks: 7, months: 2 };
+const MONTHS_PL = ['sty','lut','mar','kwi','maj','cze','lip','sie','wrz','paź','lis','gru'];
+const STATUS_COLORS = { not_started:'#94a3b8', in_progress:'#c9a227', blocked:'#dc2626', done:'#2d6a4f', cancelled:'#cbd5e1' };
+
+let currentUnit = 'weeks';
+let allDated = [];
+let baseMin = null, baseMax = null;      // raw date range (folds in today)
+let rangeStart = null, rangeEnd = null;  // effective range for the current unit
+let pxDay = PXDAY[currentUnit], chartWidth = 0, totalRows = 0;
+
+function parseLocal(s) {
+    if (!s) return null;
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);  // LOCAL — avoids UTC off-by-one
+}
+function dayDiff(a, b) { return Math.round((b - a) / 86400000); }
+function dateToX(date) { return dayDiff(rangeStart, date) * pxDay; }
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function mondayOnOrBefore(d) { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+function escHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function loadGantt() {
+    const data = await fetch(`/timeline/api/${ITEM_ID}`).then(r => r.json());
+    allDated = (data.subtasks || []).filter(s => s.start_date || s.finish_date);
+    if (!allDated.length) {
+        document.getElementById('g-empty').style.display = 'block';
+        document.getElementById('gantt-wrap').style.display = 'none';
+        return;
+    }
+    // Date range — fold in today so the now-line is always visible
+    let minD = null, maxD = null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const consider = d => { if (!d) return; if (!minD || d < minD) minD = d; if (!maxD || d > maxD) maxD = d; };
+    allDated.forEach(s => {
+        consider(parseLocal(s.start_date) || parseLocal(s.finish_date));
+        consider(parseLocal(s.finish_date) || parseLocal(s.start_date));
+    });
+    consider(today);
+    minD = new Date(minD); minD.setDate(minD.getDate() - 1);
+    maxD = new Date(maxD); maxD.setDate(maxD.getDate() + 1);
+    baseMin = minD; baseMax = maxD;
+    totalRows = allDated.length;
+    render();
+}
+
+function buildTicks(totalDays) {
+    const ticks = [];
+    if (currentUnit === 'days') {
+        for (let i = 0; i < totalDays; i++) {
+            const d = new Date(rangeStart); d.setDate(d.getDate() + i);
+            const major = d.getDate() === 1;
+            const lbl = major ? `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}` : String(d.getDate());
+            ticks.push({ x: i * pxDay, label: lbl, major });
+        }
+    } else if (currentUnit === 'weeks') {
+        for (let i = 0; i < totalDays; i += 7) {
+            const d = new Date(rangeStart); d.setDate(d.getDate() + i);
+            ticks.push({ x: i * pxDay, label: `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`, major: false });
+        }
+    } else { // months
+        let d = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+        while (d <= rangeEnd) {
+            const x = Math.max(0, dateToX(d));
+            ticks.push({ x, label: `${MONTHS_PL[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`, major: true });
+            d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+        }
+    }
+    return ticks;
+}
+
+function render() {
+    // Effective range: Monday-aligned weeks, month-aligned months (keeps coords ≥ 0 and grids clean).
+    if (currentUnit === 'weeks') {
+        rangeStart = mondayOnOrBefore(baseMin);
+        rangeEnd = addDays(mondayOnOrBefore(baseMax), 6);
+    } else if (currentUnit === 'months') {
+        rangeStart = new Date(baseMin.getFullYear(), baseMin.getMonth(), 1);
+        rangeEnd = new Date(baseMax.getFullYear(), baseMax.getMonth() + 1, 0);
+    } else {
+        rangeStart = new Date(baseMin); rangeEnd = new Date(baseMax);
+    }
+
+    const totalDays = dayDiff(rangeStart, rangeEnd) + 1;
+    // Fill the available width; scale tick up to fill, but never below the readable minimum.
+    const wrap = document.getElementById('gantt-wrap');
+    const chartAreaW = Math.max(120, (wrap.clientWidth || 900) - LABEL_W);
+    pxDay = Math.max(PXDAY[currentUnit], chartAreaW / totalDays);
+    chartWidth = totalDays * pxDay;
+    const fullW = LABEL_W + chartWidth;
+    const fullH = AXIS_H + totalRows * ROW_H;
+
+    const gantt = document.getElementById('gantt');
+    gantt.style.width = fullW + 'px';
+    gantt.style.height = fullH + 'px';
+
+    // Toggle active state
+    document.querySelectorAll('#g-unit-toggle button').forEach(b =>
+        b.classList.toggle('active', b.dataset.unit === currentUnit));
+
+    // ── Axis ──
+    let html = `<div class="g-axis" style="height:${AXIS_H}px;width:${fullW}px;">`;
+    html += `<div class="g-labelwrap" style="height:${AXIS_H}px;width:${LABEL_W}px;z-index:7;">
+        <div class="g-lc" style="width:${LABEL_TITLE_W}px;font-weight:600;color:var(--color-ink-subtle);">Podzadanie</div>
+        <div class="g-lc g-lc-resp" style="width:${LABEL_RESP_W}px;font-weight:600;color:var(--color-ink-subtle);">Responsible</div>
+    </div>`;
+    buildTicks(totalDays).forEach(t => {
+        html += `<div class="g-tick${t.major ? ' major' : ''}" style="left:${LABEL_W + t.x}px;height:${AXIS_H}px;">${t.label}</div>`;
+    });
+    html += `</div>`;
+
+    // ── Rows + bars ──
+    const barTop = Math.round((ROW_H - BAR_H) / 2);
+    let rows = '';
+    allDated.forEach((s, idx) => {
+        const start = parseLocal(s.start_date) || parseLocal(s.finish_date);
+        const finish = parseLocal(s.finish_date) || parseLocal(s.start_date);
+        // In weeks mode, snap the bar to whole Mon–Sun week columns it spans.
+        let bStart = start, bFinish = finish;
+        if (currentUnit === 'weeks') { bStart = mondayOnOrBefore(start); bFinish = addDays(mondayOnOrBefore(finish), 6); }
+        const x0 = dateToX(bStart);
+        const barW = Math.max(3, (dayDiff(bStart, bFinish) + 1) * pxDay);
+        const color = s.color || STATUS_COLORS[s.status] || '#94a3b8';
+
+        rows += `<div class="g-row" style="height:${ROW_H}px;width:${fullW}px;">
+            <div class="g-labelwrap" style="height:${ROW_H}px;width:${LABEL_W}px;">
+                <div class="g-lc g-title-cell" data-sid="${s.id}" style="width:${LABEL_TITLE_W}px;${EDIT_CURSOR}">
+                    <div class="g-title-clamp" title="${escHtml(s.title)}">${escHtml(s.title)}</div>
+                </div>
+                <div class="g-lc g-lc-resp g-resp-cell" data-sid="${s.id}" style="width:${LABEL_RESP_W}px;${EDIT_CURSOR}">
+                    <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;" title="${escHtml(s.responsible_name || '')}">${escHtml(s.responsible_name || '—')}</div>
+                </div>
+            </div>
+            <div class="g-bar" data-sid="${s.id}" style="left:${LABEL_W + x0}px;top:${barTop}px;height:${BAR_H}px;width:${barW}px;background:${color};${EDIT_CURSOR}"
+                 title="${escHtml(s.title)} (${escHtml(s.start_date||'?')} → ${escHtml(s.finish_date||'?')})"></div>
+        </div>`;
+    });
+
+    const nowHtml = `<div id="g-nowline" style="height:${fullH}px;"></div><div id="g-nowlabel"></div>`;
+    gantt.innerHTML = html + rows + nowHtml;
+    positionNow();
+}
+
+function positionNow() {
+    if (!rangeStart) return;
+    const now = new Date();
+    const x = LABEL_W + (now - rangeStart) / 86400000 * pxDay;
+    const line = document.getElementById('g-nowline');
+    const label = document.getElementById('g-nowlabel');
+    const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    if (line) line.style.left = x + 'px';
+    if (label) { label.style.left = x + 'px'; label.textContent = 'Teraz ' + hhmm; }
+    const clock = document.getElementById('g-clock');
+    if (clock) clock.textContent = hhmm;
+}
+
+// ── Inline editing (managers only) ───────────────────────────────────────────
+function findSub(sid) { return allDated.find(s => String(s.id) === String(sid)); }
+
+async function saveSubtaskFields(sid, fields) {
+    const resp = await fetch(`/items/api/${ITEM_ID}/subtasks/${sid}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields)
+    });
+    const data = await resp.json();
+    if (data.success) { Notifications.success('Zapisano'); loadGantt(); }
+    else Notifications.error(data.error || 'Błąd zapisu');
+}
+
+// #1 Title → inline textarea (same box); save button appears on modification.
+function startTitleEdit(cell) {
+    const s = findSub(cell.dataset.sid); if (!s) return;
+    cell.closest('.g-labelwrap').style.zIndex = 60;
+    cell.innerHTML = `<div style="position:relative;width:100%;">
+        <textarea class="inline-edit gt-input" style="width:100%;height:${ROW_H - 12}px;font-size:.78rem;line-height:1.2;border:1px solid var(--color-accent);border-radius:2px;padding:3px 24px 3px 5px;resize:none;font-family:inherit;box-sizing:border-box;outline:none;">${escHtml(s.title)}</textarea>
+        <button class="gt-save" title="Zapisz" style="display:none;position:absolute;right:3px;top:3px;width:19px;height:19px;padding:0;border:none;border-radius:2px;background:var(--color-accent);color:#fff;cursor:pointer;font-size:12px;line-height:1;">✓</button>
+    </div>`;
+    const ta = cell.querySelector('.gt-input'), btn = cell.querySelector('.gt-save');
+    ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+    ta.addEventListener('input', () => { btn.style.display = (ta.value.trim() && ta.value.trim() !== s.title) ? 'block' : 'none'; });
+    ta.addEventListener('keydown', e => { if (e.key === 'Escape') render(); });
+    btn.addEventListener('click', () => {
+        const t = ta.value.trim();
+        if (!t) { Notifications.error('Tytuł jest wymagany'); return; }
+        saveSubtaskFields(s.id, { title: t });
+    });
+}
+
+// #2 Responsible → real-time filter dropdown of active users.
+function startRespEdit(cell) {
+    const s = findSub(cell.dataset.sid); if (!s) return;
+    cell.closest('.g-labelwrap').style.zIndex = 60;
+    cell.style.overflow = 'visible';
+    cell.innerHTML = `<div class="inline-editor" style="position:relative;width:100%;">
+        <input class="inline-edit gr-input" placeholder="Szukaj..." style="width:100%;font-size:.78rem;border:1px solid var(--color-accent);border-radius:2px;padding:3px 5px;font-family:inherit;box-sizing:border-box;outline:none;">
+        <div class="gr-panel" style="position:absolute;left:0;top:calc(100% + 2px);width:210px;max-height:200px;overflow:auto;background:#fff;border:1px solid var(--color-border);border-radius:2px;box-shadow:0 6px 22px rgba(0,0,0,.2);z-index:80;"></div>
+    </div>`;
+    const input = cell.querySelector('.gr-input'), panel = cell.querySelector('.gr-panel');
+    function renderList(filter) {
+        const f = (filter || '').toLowerCase();
+        const opts = [{ id: '', name: '— brak —' }].concat(ACTIVE_USERS.filter(u => u.name.toLowerCase().includes(f)));
+        panel.innerHTML = opts.map(u =>
+            `<div class="gr-item" data-uid="${u.id}" style="padding:5px 9px;font-size:.78rem;cursor:pointer;${String(u.id) === String(s.responsible_user_id || '') ? 'background:var(--color-accent-muted);' : ''}">${escHtml(u.name)}</div>`
+        ).join('') || '<div style="padding:6px 9px;color:#999;font-size:.75rem;">Brak</div>';
+        panel.querySelectorAll('.gr-item').forEach(it => it.addEventListener('mousedown', ev => {
+            ev.preventDefault();
+            const uid = it.dataset.uid;
+            saveSubtaskFields(s.id, { responsible_user_id: uid ? parseInt(uid) : null });
+        }));
+    }
+    renderList(''); input.focus();
+    input.addEventListener('input', () => renderList(input.value));
+    input.addEventListener('keydown', e => { if (e.key === 'Escape') render(); });
+    input.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== input) render(); }, 150));
+}
+
+// #3 Bar click → nearby modal with start/finish date pickers.
+function openDateEditor(sid, barEl) {
+    document.querySelectorAll('.gd-overlay').forEach(o => o.remove());
+    const s = findSub(sid); if (!s) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'gd-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:transparent;z-index:9999;';
+    const panel = document.createElement('div');
+    panel.style.cssText = 'position:fixed;background:#fff;border-radius:3px;border:1px solid rgba(0,0,0,.06);box-shadow:0 8px 28px rgba(0,0,0,.28),0 2px 8px rgba(0,0,0,.18);padding:12px;width:220px;';
+    panel.innerHTML = `
+        <div style="font-size:.78rem;font-weight:600;margin-bottom:8px;">${escHtml(s.title)}</div>
+        <label style="display:block;font-size:.72rem;color:var(--color-ink-muted);margin-bottom:2px;">Start</label>
+        <input id="gd-start" type="date" value="${s.start_date || ''}" style="width:100%;font-size:.8rem;padding:4px 6px;border:1px solid var(--color-border);border-radius:2px;margin-bottom:9px;font-family:inherit;box-sizing:border-box;">
+        <label style="display:block;font-size:.72rem;color:var(--color-ink-muted);margin-bottom:2px;">Koniec</label>
+        <input id="gd-finish" type="date" value="${s.finish_date || ''}" style="width:100%;font-size:.8rem;padding:4px 6px;border:1px solid var(--color-border);border-radius:2px;margin-bottom:11px;font-family:inherit;box-sizing:border-box;">
+        <div style="display:flex;justify-content:flex-end;gap:7px;">
+            <button id="gd-cancel" style="font-size:.74rem;padding:5px 11px;border:1px solid var(--color-border);border-radius:2px;background:#fff;cursor:pointer;font-family:inherit;">Anuluj</button>
+            <button id="gd-save" style="font-size:.74rem;padding:5px 11px;border:none;border-radius:2px;background:var(--color-accent);color:#fff;cursor:pointer;font-family:inherit;">Zapisz</button>
+        </div>`;
+    overlay.appendChild(panel); document.body.appendChild(overlay);
+    const rect = barEl.getBoundingClientRect(), pw = panel.offsetWidth, ph = panel.offsetHeight;
+    panel.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - pw - 8)) + 'px';
+    panel.style.top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - ph - 8)) + 'px';
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    panel.querySelector('#gd-cancel').addEventListener('click', () => overlay.remove());
+    panel.querySelector('#gd-save').addEventListener('click', () => {
+        const start = panel.querySelector('#gd-start').value || null;
+        const finish = panel.querySelector('#gd-finish').value || null;
+        overlay.remove();
+        saveSubtaskFields(s.id, { start_date: start, finish_date: finish });
+    });
+}
+
+if (CAN_MANAGE) {
+    document.getElementById('gantt').addEventListener('click', e => {
+        const bar = e.target.closest('.g-bar');
+        if (bar && bar.dataset.sid) { openDateEditor(bar.dataset.sid, bar); return; }
+        if (e.target.closest('.inline-edit, .gt-save, .gr-panel, .inline-editor')) return;  // clicks inside an open editor
+        const tCell = e.target.closest('.g-title-cell');
+        if (tCell) { const sid = tCell.dataset.sid; render(); startTitleEdit(document.querySelector(`#gantt .g-title-cell[data-sid="${sid}"]`)); return; }
+        const rCell = e.target.closest('.g-resp-cell');
+        if (rCell) { const sid = rCell.dataset.sid; render(); startRespEdit(document.querySelector(`#gantt .g-resp-cell[data-sid="${sid}"]`)); return; }
+    });
+}
+
+document.querySelectorAll('#g-unit-toggle button').forEach(b =>
+    b.addEventListener('click', () => { currentUnit = b.dataset.unit; if (baseMin) render(); }));
+
+// Responsive: re-render (and re-fill width) on window resize.
+let _rzTimer;
+window.addEventListener('resize', () => { clearTimeout(_rzTimer); _rzTimer = setTimeout(() => { if (baseMin) render(); }, 150); });
+
+loadGantt();
+setInterval(positionNow, 60000);
+setInterval(() => { const c = document.getElementById('g-clock'); if (c) { const n = new Date(); c.textContent = `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`; } }, 1000);
+</script>
+{% endblock %}

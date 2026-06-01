@@ -3,21 +3,19 @@ from flask import redirect, url_for, flash
 from flask_login import current_user
 
 ROLE_HIERARCHY = {
-    'superuser': 2,
-    'operator': 1,
+    'superuser':   4,
+    'manager':     3,
+    'contributor': 2,
+    'viewer':      1,
 }
 
-# Static fallback — DB role_permissions is the real source of truth
+# Static fallback — DB role_permissions is the real source of truth (mirrors the seed)
 MODULE_PERMISSIONS = {
-    'dmc_validation': ['superuser', 'operator'],
-    'history':        ['superuser', 'operator'],
-    'admin':          ['superuser'],
-    'audit':          ['superuser'],
-    'manual_mode':    ['superuser'],
-    'tryb_korekty':   ['superuser'],
+    'actions':  ['superuser', 'manager', 'contributor', 'viewer'],
+    'timeline': ['superuser', 'manager', 'contributor', 'viewer'],
+    'admin':    ['superuser'],
+    'audit':    ['superuser', 'manager'],
 }
-
-# TODO: MODULE_PERMISSIONS, ROLE_HIERARCHY - to redefine according the project scope and reqs
 
 
 def role_required(*roles):
@@ -77,3 +75,9 @@ def get_user_module_permissions(role_name: str) -> dict:
             module: role_name in allowed_roles
             for module, allowed_roles in MODULE_PERMISSIONS.items()
         }
+
+
+# Write-authz for all item/subtask create/update/delete endpoints.
+# (The subtask STATUS endpoint is the exception — it uses module_permission_required('actions')
+#  and branches on role_has_flag('subtasks_update_assigned_only') inside the handler.)
+manage_actions_required = role_required('superuser', 'manager')

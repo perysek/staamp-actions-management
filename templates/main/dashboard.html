@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Pulpit — {{ app_name }}{% endblock %}
+{% block page_heading %}Pulpit{% endblock %}
+
+{% set status_colors = {
+    'open':        '#1e6091',
+    'in_progress': '#c9a227',
+    'on_hold':     '#9a6700',
+    'done':        '#2d6a4f',
+    'cancelled':   '#8a8a8a',
+} %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Pulpit</h1>
+            <p class="page-subtitle">Przegląd działań według statusu</p>
+        </div>
+        {% if user_permissions.actions %}
+        <a href="{{ url_for('items.items_list') }}" class="ff-btn ff-btn-secondary btn-press">
+            <span class="material-icons" style="font-size:17px;">assignment</span> Wszystkie działania
+        </a>
+        {% endif %}
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:1rem;margin-bottom:1.5rem;">
+        <div class="ff-section" style="margin:0;">
+            <div class="stat-label">Wszystkie</div>
+            <div class="stat-value" style="font-size:1.75rem;">{{ total }}</div>
+        </div>
+        {% for s in summary %}
+        <div class="ff-section" style="margin:0;border-left:3px solid {{ status_colors.get(s.status, '#8a8a8a') }};">
+            <div class="stat-label">{{ s.label }}</div>
+            <div class="stat-value" style="font-size:1.75rem;color:{{ status_colors.get(s.status, '#1a1a1a') }};">{{ s.count }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if total == 0 %}
+    <div class="ff-section" style="text-align:center;color:var(--color-ink-subtle);">
+        Brak działań do wyświetlenia.
+        {% if current_user.role in ['superuser', 'manager'] %}
+        <div style="margin-top:.75rem;">
+            <a href="{{ url_for('items.create_item') }}" class="ff-btn ff-btn-primary btn-press">+ Nowe działanie</a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

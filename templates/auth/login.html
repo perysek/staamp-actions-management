@@ -49,9 +49,9 @@
 <div style="max-width:400px;width:100%;margin:0 1rem;">
 
     <div style="text-align:center;margin-bottom:1.5rem;">
-        <span class="material-icons" style="color:var(--color-accent);font-size:32px;">qr_code_scanner</span>
+        <span class="material-icons" style="color:var(--color-accent);font-size:32px;">checklist</span>
         <div style="font-size:1.25rem;font-weight:600;margin-top:.5rem;">{{ app_name }}</div>
-        <div style="font-size:.8rem;color:var(--color-ink-subtle);margin-top:.2rem;">Sensor Cover Quality Control</div>
+        <div style="font-size:.8rem;color:var(--color-ink-subtle);margin-top:.2rem;">Zarządzanie działaniami STAAMP</div>
     </div>
 
     <div class="login-card">
@@ -74,7 +74,8 @@
                 <input type="text" id="employee_id" name="employee_id"
                        value="{{ employee_id or '' }}" required autofocus
                        autocomplete="off" inputmode="numeric" maxlength="4"
-                       placeholder="0000" class="emp-id-input"
+                       pattern="9[0-9]{3}" title="Numer pracownika musi zaczynać się od 9 (4 cyfry)"
+                       placeholder="9xxx" class="emp-id-input"
                        list="employees-list">
                 <datalist id="employees-list">
                     {% for emp in login_employees %}
@@ -133,13 +134,6 @@
             <a href="{{ url_for('auth.forgot_password') }}"
                style="font-size:.75rem;color:var(--color-ink-subtle);text-decoration:none;">
                 Nie pamiętam hasła
-            </a>
-            <span style="color:var(--color-border);">|</span>
-            <a href="{{ url_for('main.manual_logowanie') }}"
-               target="_blank"
-               style="font-size:.75rem;color:var(--color-ink-subtle);text-decoration:none;display:inline-flex;align-items:center;gap:.25rem;">
-                <span class="material-icons" style="font-size:13px;">menu_book</span>
-                Instrukcja logowania
             </a>
         </div>
     </div>

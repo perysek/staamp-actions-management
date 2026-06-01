@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}{{ item['title'] }} — {{ app_name }}{% endblock %}
+{% block page_heading %}Szczegóły działania{% endblock %}
+
+{% set status_colors = {
+    'open':'#1e6091','in_progress':'#c9a227','on_hold':'#9a6700','done':'#2d6a4f','cancelled':'#8a8a8a'
+} %}
+{% set status_labels = {
+    'open':'Otwarte','in_progress':'W toku','on_hold':'Wstrzymane','done':'Zakończone','cancelled':'Anulowane'
+} %}
+{% set type_labels = {'task':'Zadanie','project':'Projekt','action':'Działanie','goal':'Cel'} %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <div style="display:flex;align-items:center;gap:.6rem;">
+                <span class="badge badge-na">{{ type_labels.get(item['item_type'], item['item_type']) }}</span>
+                <h1 class="page-title">{{ item['title'] }}</h1>
+            </div>
+            <p class="page-subtitle">
+                Status:
+                <span class="badge" style="background:#f1f5f9;color:{{ status_colors.get(item['status'],'#475569') }};">
+                    {{ status_labels.get(item['status'], item['status']) }}
+                </span>
+                {% if item['due_date'] %}&nbsp;·&nbsp; Termin: <span style="font-family:monospace;">{{ item['due_date'] }}</span>{% endif %}
+            </p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+            <a href="{{ url_for('timeline.timeline_view', item_id=item['id']) }}" class="ff-btn ff-btn-secondary btn-press">
+                <span class="material-icons" style="font-size:17px;">timeline</span> Pokaż oś czasu
+            </a>
+            {% if can_manage %}
+            <a href="{{ url_for('items.edit_item', item_id=item['id']) }}" class="ff-btn ff-btn-secondary btn-press">Edytuj</a>
+            <button onclick="openSubtaskModal()" class="ff-btn ff-btn-primary btn-press">+ Podzadanie</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Item meta -->
+    <div class="ff-section">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+            <div>
+                <div class="stat-label">Odpowiedzialni (działanie)</div>
+                <div style="margin-top:.35rem;display:flex;flex-wrap:wrap;gap:.35rem;">
+                    {% for r in responsibles %}
+                    <span class="badge" style="background:var(--color-accent-muted);color:var(--color-ink);">{{ r['full_name'] }}</span>
+                    {% else %}
+                    <span style="color:var(--color-ink-subtle);font-size:.8125rem;">—</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% if item['description'] %}
+            <div>
+                <div class="stat-label">Opis</div>
+                <div style="margin-top:.35rem;font-size:.8125rem;font-weight:300;color:var(--color-ink-muted);white-space:pre-wrap;">{{ item['description'] }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Subtasks -->
+    <div class="table-container">
+        <div class="table-scroll-wrapper">
+            <div id="st-loading" style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Ładowanie podzadań…</div>
+            <div id="st-empty" style="display:none;padding:2rem;text-align:center;color:var(--color-ink-subtle);">Brak podzadań</div>
+            <table class="refined-table" id="st-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th class="no-sort" style="width:46px;padding-left:1rem;padding-right:0;"></th>
+                        <th class="no-sort">Tytuł</th>
+                        <th class="no-sort">Odpowiedzialny</th>
+                        <th class="no-sort">Start</th>
+                        <th class="no-sort">Koniec</th>
+                        <th class="no-sort">Status</th>
+                        <th class="no-sort"></th>
+                    </tr>
+                </thead>
+                <tbody id="st-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const ITEM_ID = {{ item['id'] }};
+const CAN_MANAGE = {{ can_manage|tojson }};
+const CAN_UPDATE_OWN = {{ can_update_own|tojson }};
+const CURRENT_USER_ID = {{ current_user.id }};
+const ACTIVE_USERS = [{% for u in active_users %}{ id: {{ u['id'] }}, name: {{ u['full_name']|tojson }} },{% endfor %}];
+const STATUS_OPTIONS = [{% for v, l in subtask_status_options %}[{{ v|tojson }}, {{ l|tojson }}],{% endfor %}];
+const STATUS_LABELS = { not_started:'Nie rozpoczęte', in_progress:'W toku', blocked:'Zablokowane', done:'Zakończone', cancelled:'Anulowane' };
+const STATUS_BADGE = {
+    not_started:'background:#f1f5f9;color:#475569;',
+    in_progress:'background:#fef9ed;color:#9a6700;',
+    blocked:'background:#fee2e2;color:#dc2626;',
+    done:'background:#dcfce7;color:#15803d;',
+    cancelled:'background:#f1f5f9;color:#94a3b8;',
+};
+// Fallback bar/indicator color per status (matches the Gantt STATUS_COLORS) when no custom color is set.
+const STATUS_DOT = {
+    not_started:'#94a3b8', in_progress:'#c9a227', blocked:'#dc2626', done:'#2d6a4f', cancelled:'#cbd5e1'
+};
+
+let currentSubtasks = [];
+
+function escHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function canChangeStatus(st) {
+    return CAN_MANAGE || (CAN_UPDATE_OWN && st.responsible_user_id === CURRENT_USER_ID);
+}
+
+async function loadSubtasks() {
+    const resp = await fetch(`/items/api/${ITEM_ID}/subtasks`);
+    const data = await resp.json();
+    currentSubtasks = data.subtasks || [];
+    renderSubtasks();
+}
+
+function renderSubtasks() {
+    document.getElementById('st-loading').style.display = 'none';
+    if (!currentSubtasks.length) {
+        document.getElementById('st-empty').style.display = 'block';
+        document.getElementById('st-table').style.display = 'none';
+        return;
+    }
+    document.getElementById('st-empty').style.display = 'none';
+    document.getElementById('st-table').style.display = 'table';
+
+    document.getElementById('st-body').innerHTML = currentSubtasks.map(st => {
+        // status: editable dropdown if allowed, else badge
+        let statusCell;
+        if (canChangeStatus(st)) {
+            const opts = STATUS_OPTIONS.map(([v, l]) =>
+                `<option value="${v}" ${v === st.status ? 'selected' : ''}>${escHtml(l)}</option>`).join('');
+            statusCell = `<select onchange="changeStatus(${st.id}, this)" class="ff-select" style="padding:.25rem .4rem;font-size:.75rem;width:auto;">${opts}</select>`;
+        } else {
+            statusCell = `<span class="badge" style="${STATUS_BADGE[st.status] || ''}">${escHtml(STATUS_LABELS[st.status] || st.status)}</span>`;
+        }
+
+        let actions = '';
+        if (CAN_MANAGE) {
+            actions = `<button onclick='editSubtask(${st.id})' style="padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);cursor:pointer;">Edytuj</button>
+                <button onclick='deleteSubtask(${st.id})' style="padding:.3rem .6rem;font-size:.75rem;border:1px solid #fca5a5;border-radius:2px;background:#fff;color:#dc2626;cursor:pointer;">Usuń</button>`;
+        }
+
+        const dotColor = st.color || STATUS_DOT[st.status] || '#94a3b8';
+        const colorCell = CAN_MANAGE
+            ? `<button onclick="openColorPicker(${st.id}, this)" title="Zmień kolor podzadania" style="box-sizing:border-box;width:15px;height:15px;padding:0;border:1px solid rgba(0,0,0,.25);border-radius:2px;background:${dotColor};cursor:pointer;display:inline-block;vertical-align:middle;"></button>`
+            : `<span title="Kolor podzadania" style="box-sizing:border-box;width:15px;height:15px;border:1px solid rgba(0,0,0,.2);border-radius:2px;background:${dotColor};display:inline-block;vertical-align:middle;"></span>`;
+
+        return `<tr class="table-row-hover">
+            <td style="padding-left:1rem;padding-right:0;">${colorCell}</td>
+            <td><strong>${escHtml(st.title)}</strong></td>
+            <td style="color:var(--color-ink-muted);">${escHtml(st.responsible_name || '—')}</td>
+            <td style="font-family:monospace;">${escHtml(st.start_date || '—')}</td>
+            <td style="font-family:monospace;">${escHtml(st.finish_date || '—')}</td>
+            <td>${statusCell}</td>
+            <td style="text-align:right;white-space:nowrap;padding:.5rem 1rem;">${actions}</td>
+        </tr>`;
+    }).join('');
+}
+
+async function changeStatus(subtaskId, sel) {
+    const newStatus = sel.value;
+    const resp = await fetch(`/items/api/${ITEM_ID}/subtasks/${subtaskId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+    });
+    const data = await resp.json();
+    if (data.success) { Notifications.success('Zaktualizowano status'); loadSubtasks(); }
+    else { Notifications.error(data.error || 'Błąd zmiany statusu'); loadSubtasks(); }
+}
+
+function deleteSubtask(subtaskId) {
+    const st = currentSubtasks.find(s => s.id === subtaskId);
+    Modals.confirm({
+        title: 'Usuń podzadanie',
+        message: `Czy na pewno usunąć „${st ? st.title : ''}”?`,
+        confirmText: 'Usuń', cancelText: 'Anuluj', type: 'danger',
+        onConfirm: async () => {
+            const resp = await fetch(`/items/api/${ITEM_ID}/subtasks/${subtaskId}`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) { Notifications.success('Usunięto podzadanie'); loadSubtasks(); }
+            else Notifications.error(data.error || 'Błąd usuwania');
+        },
+    });
+}
+
+function editSubtask(subtaskId) {
+    const st = currentSubtasks.find(s => s.id === subtaskId);
+    if (st) openSubtaskModal(st);
+}
+
+// ── Subtask create/edit modal ────────────────────────────────────────────────
+function userOptions(selectedId) {
+    const opts = ['<option value="">— brak —</option>'];
+    ACTIVE_USERS.forEach(u => opts.push(`<option value="${u.id}" ${u.id === selectedId ? 'selected' : ''}>${escHtml(u.name)}</option>`));
+    return opts.join('');
+}
+
+function openSubtaskModal(st) {
+    const isEdit = !!st;
+    const editId = isEdit ? st.id : null;
+    const statusSel = STATUS_OPTIONS.map(([v, l]) =>
+        `<option value="${v}" ${isEdit && v === st.status ? 'selected' : ''}>${escHtml(l)}</option>`).join('');
+
+    const content = `
+        <div class="ff-group">
+            <label class="ff-label">Tytuł <span class="ff-req">*</span></label>
+            <input id="m-title" class="ff-input" value="${isEdit ? escHtml(st.title) : ''}" placeholder="Tytuł podzadania">
+        </div>
+        <div class="ff-group">
+            <label class="ff-label">Odpowiedzialny</label>
+            <select id="m-resp" class="ff-select">${userOptions(isEdit ? st.responsible_user_id : null)}</select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+            <div class="ff-group">
+                <label class="ff-label">Start</label>
+                <input id="m-start" type="date" class="ff-input" value="${isEdit && st.start_date ? st.start_date : ''}">
+            </div>
+            <div class="ff-group">
+                <label class="ff-label">Koniec</label>
+                <input id="m-finish" type="date" class="ff-input" value="${isEdit && st.finish_date ? st.finish_date : ''}">
+            </div>
+        </div>
+        <div class="ff-group">
+            <label class="ff-label">Status</label>
+            <select id="m-status" class="ff-select">${statusSel}</select>
+        </div>
+        <div class="ff-group">
+            <label class="ff-label">Opis</label>
+            <textarea id="m-desc" class="ff-textarea" rows="2">${isEdit && st.description ? escHtml(st.description) : ''}</textarea>
+        </div>
+    `;
+
+    const overlay = Modals.show({
+        title: isEdit ? 'Edytuj podzadanie' : 'Nowe podzadanie',
+        content, size: 'large',
+        buttons: [
+            { text: 'Anuluj', type: 'secondary', onClick: (e, o) => o.remove() },
+            { text: 'Zapisz', type: 'primary', onClick: (e, o) => saveSubtask(editId, o) },
+        ],
+    });
+
+    // Enhance the responsible select with search
+    SearchableSelect.enhance(overlay.querySelector('#m-resp'));
+    overlay.dataset.editId = editId === null ? '' : editId;
+}
+
+async function saveSubtask(editId, overlay) {
+    const title = overlay.querySelector('#m-title').value.trim();
+    if (!title) { Notifications.error('Tytuł jest wymagany'); return; }
+    const respVal = overlay.querySelector('#m-resp').value;
+
+    const payload = {
+        title,
+        description: overlay.querySelector('#m-desc').value || null,
+        responsible_user_id: respVal ? parseInt(respVal) : null,
+        start_date: overlay.querySelector('#m-start').value || null,
+        finish_date: overlay.querySelector('#m-finish').value || null,
+        status: overlay.querySelector('#m-status').value,
+    };
+
+    const url = editId
+        ? `/items/api/${ITEM_ID}/subtasks/${editId}`
+        : `/items/api/${ITEM_ID}/subtasks`;
+    const method = editId ? 'PUT' : 'POST';
+    const resp = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.success) {
+        Notifications.success(editId ? 'Zapisano podzadanie' : 'Dodano podzadanie');
+        overlay.remove();
+        loadSubtasks();
+    } else {
+        Notifications.error(data.error || 'Błąd zapisu');
+    }
+}
+
+// ── Color picker (8×8 palette) ───────────────────────────────────────────────
+function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => {
+        const c = l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+        return Math.round(255 * c).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function buildPalette() {
+    const out = [];
+    for (let r = 0; r < 8; r++) {
+        const light = 88 - r * (76 / 7);          // 88% (top) .. 12% (bottom)
+        for (let c = 0; c < 8; c++) {
+            if (c === 0) out.push(hslToHex(0, 0, light));               // greyscale column
+            else out.push(hslToHex(Math.round((c - 1) * 360 / 7), 70, light));  // 7 hue columns
+        }
+    }
+    return out;
+}
+
+function openColorPicker(subtaskId, anchorEl) {
+    document.querySelectorAll('.cp-overlay').forEach(o => o.remove());  // only one at a time
+
+    // Transparent backdrop — no blur, no dimming; just captures outside clicks to close.
+    const overlay = document.createElement('div');
+    overlay.className = 'cp-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:transparent;z-index:9999;';
+
+    // Panel shrinks to the grid width + padding; 3px radius; separated only by gradient shadow.
+    const panel = document.createElement('div');
+    panel.style.cssText = 'position:fixed;background:#fff;border-radius:3px;border:1px solid rgba(0,0,0,.06);' +
+        'box-shadow:0 8px 28px rgba(0,0,0,.28),0 2px 8px rgba(0,0,0,.18),0 0 0 1px rgba(0,0,0,.04);padding:10px;';
+
+    const grid = buildPalette().map(hex =>
+        `<button class="cp-swatch" data-color="${hex}" title="${hex}"
+                 style="width:30px;height:30px;padding:0;border:1px solid rgba(0,0,0,.15);border-radius:2px;background:${hex};cursor:pointer;"></button>`
+    ).join('');
+    panel.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(8,30px);gap:5px;">${grid}</div>
+        <div style="text-align:center;margin-top:9px;">
+            <button id="cp-clear" style="font-size:.72rem;padding:.3rem .6rem;border:1px solid var(--color-border);border-radius:3px;background:#fff;cursor:pointer;color:var(--color-ink-muted);font-family:inherit;">Domyślny (wg statusu)</button>
+        </div>`;
+
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    // Position: top-left corner at the indicator's X, and its Y minus 20px (viewport coords).
+    const rect = anchorEl.getBoundingClientRect();
+    const pw = panel.offsetWidth, ph = panel.offsetHeight;
+    let left = Math.max(8, Math.min(rect.left + 20, window.innerWidth - pw - 8));
+    let top  = Math.max(8, Math.min(rect.top - 20, window.innerHeight - ph - 8));
+    panel.style.left = left + 'px';
+    panel.style.top = top + 'px';
+
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.addEventListener('keydown', function esc(e) {
+        if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+    });
+    panel.querySelectorAll('.cp-swatch').forEach(b =>
+        b.addEventListener('click', () => applyColor(subtaskId, b.dataset.color, overlay)));
+    panel.querySelector('#cp-clear').addEventListener('click', () => applyColor(subtaskId, null, overlay));
+}
+
+async function applyColor(subtaskId, color, overlay) {
+    const resp = await fetch(`/items/api/${ITEM_ID}/subtasks/${subtaskId}/color`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ color }),
+    });
+    const data = await resp.json();
+    if (data.success) { overlay.remove(); loadSubtasks(); }
+    else Notifications.error(data.error || 'Błąd zmiany koloru');
+}
+
+loadSubtasks();
+</script>
+{% endblock %}

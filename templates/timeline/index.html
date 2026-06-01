@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Oś czasu — {{ app_name }}{% endblock %}
+{% block page_heading %}Oś czasu{% endblock %}
+
+{% set status_labels = {
+    'open':'Otwarte','in_progress':'W toku','on_hold':'Wstrzymane','done':'Zakończone','cancelled':'Anulowane'
+} %}
+{% set type_labels = {'task':'Zadanie','project':'Projekt','action':'Działanie','goal':'Cel'} %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Oś czasu</h1>
+            <p class="page-subtitle">Wybierz działanie, aby zobaczyć wykres Gantta jego podzadań</p>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <div class="table-scroll-wrapper">
+            {% if items %}
+            <table class="refined-table">
+                <thead>
+                    <tr>
+                        <th class="no-sort">Typ</th>
+                        <th class="no-sort">Tytuł</th>
+                        <th class="no-sort">Status</th>
+                        <th class="no-sort">Podzadania</th>
+                        <th class="no-sort"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for it in items %}
+                    <tr class="table-row-hover">
+                        <td>{{ type_labels.get(it.item_type, it.item_type) }}</td>
+                        <td><strong>{{ it.title }}</strong></td>
+                        <td><span class="badge badge-na">{{ status_labels.get(it.status, it.status) }}</span></td>
+                        <td style="text-align:center;">{{ it.subtask_count }}</td>
+                        <td style="text-align:right;padding:.5rem 1rem;">
+                            <a href="{{ url_for('timeline.timeline_view', item_id=it.id) }}"
+                               class="ff-btn ff-btn-secondary btn-press" style="font-size:.75rem;padding:.3rem .6rem;">
+                                <span class="material-icons" style="font-size:15px;">timeline</span> Gantt
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Brak działań</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

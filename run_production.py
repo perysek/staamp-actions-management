@@ -14,13 +14,13 @@ PORT = int(os.environ.get("SERVER_PORT", 8093))
 
 if __name__ == "__main__":
     app = create_app()
-    print(f"Starting DMC Validator production server on port {PORT}")
+    print(f"Starting production server on port {PORT}")
     serve(
         app,
         host="0.0.0.0",
         port=PORT,
         threads=4,
         connection_limit=100,
-        channel_timeout=60,
+        channel_timeout=180,
         url_scheme="http",
     )

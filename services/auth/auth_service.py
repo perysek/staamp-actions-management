@@ -19,7 +19,11 @@ class AuthService:
         return True, user, None
 
     def authenticate_by_employee_id(self, mosys_employee_id: str, password: str) -> Tuple[bool, Optional[User], Optional[str]]:
-        user = self.user_repo.get_by_mosys_employee_id(mosys_employee_id.strip())
+        mosys_employee_id = mosys_employee_id.strip()
+        # Per FLASK-RBAC-GOLDEN-BOOK: only MOSYS ids starting with "9" are valid operators.
+        if not mosys_employee_id.startswith('9'):
+            return False, None, "Nieprawidłowy nr pracownika — numer musi zaczynać się od 9"
+        user = self.user_repo.get_by_mosys_employee_id(mosys_employee_id)
         if not user:
             return False, None, "Nieprawidłowy nr pracownika lub hasło"
         if not user.is_active:
