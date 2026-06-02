@@ -36,11 +36,11 @@
             <table class="refined-table" id="emp-table" style="display:none;">
                 <thead>
                     <tr>
-                        <th class="no-sort">Nazwisko i imię</th>
+                        <th class="no-sort" style="min-width:180px;">Nazwisko i imię</th>
                         <th class="no-sort">Nr pracownika</th>
                         <th class="no-sort">ID MOSYS</th>
                         <th class="no-sort">Konto użytkownika</th>
-                        <th class="no-sort"></th>
+                        <th class="no-sort" style="width:80px;"></th>
                     </tr>
                 </thead>
                 <tbody id="emp-body"></tbody>
@@ -126,8 +126,8 @@ function renderEmployees(employees) {
             : '<span style="color:var(--color-ink-subtle);">—</span>';
         const deleteBtn = e.user_id ? '' :
             `<button onclick="deleteEmployee(${e.id}, '${escHtml(e.last_name)}')"
-                     style="padding:.25rem .5rem;font-size:.7rem;border:1px solid #fca5a5;border-radius:.3rem;background:#fff;color:#dc2626;cursor:pointer;">
-                Usuń
+                     title="Usuń" style="width:30px;height:30px;border:1px solid #fca5a5;border-radius:2px;background:#fff;color:#dc2626;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">
+                <span class="material-icons" style="font-size:16px;">delete</span>
             </button>`;
 
         return `<tr class="table-row-hover">
@@ -137,8 +137,8 @@ function renderEmployees(employees) {
             <td>${userBadge}</td>
             <td style="text-align:right;display:flex;gap:.4rem;justify-content:flex-end;padding:.4rem 1rem;">
                 <button onclick="openEditModal(${JSON.stringify(e).replace(/"/g,'&quot;')})"
-                        style="padding:.25rem .5rem;font-size:.7rem;border:1px solid var(--color-border);border-radius:.3rem;background:#fff;color:var(--color-ink-muted);cursor:pointer;">
-                    Edytuj
+                        title="Edytuj" style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">
+                    <span class="material-icons" style="font-size:16px;">edit</span>
                 </button>
                 ${deleteBtn}
             </td>

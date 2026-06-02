@@ -66,10 +66,12 @@ def item_detail(item_id: int):
     active_users = _item_repo.get_active_users()
     can_manage = current_user.role in ('superuser', 'manager')
     can_update_own = _role_repo.role_has_flag(current_user.role, 'subtasks_update_assigned_only')
+    subtask_count = _item_repo.count_subtasks(item_id)
     return render_template('items/detail.html', item=item, responsibles=responsibles,
                            active_users=active_users, can_manage=can_manage,
                            can_update_own=can_update_own,
-                           subtask_status_options=SUBTASK_STATUS_OPTIONS)
+                           subtask_status_options=SUBTASK_STATUS_OPTIONS,
+                           subtask_count=subtask_count)
 
 
 @items_bp.route('/create')

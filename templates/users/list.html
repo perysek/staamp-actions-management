@@ -26,12 +26,12 @@
             <table class="refined-table" id="users-table" style="display:none;">
                 <thead>
                     <tr>
-                        <th class="no-sort">Imię i nazwisko</th>
+                        <th class="no-sort" style="min-width:160px;">Imię i nazwisko</th>
                         <th class="no-sort">Rola</th>
                         <th class="no-sort">Nr prac.</th>
                         <th class="no-sort">Status</th>
                         <th class="no-sort">Ostatnie logowanie</th>
-                        <th class="no-sort"></th>
+                        <th class="no-sort" style="width:100px;"></th>
                     </tr>
                 </thead>
                 <tbody id="users-body"></tbody>
@@ -95,10 +95,10 @@ function renderUsers(users) {
             ? '<span class="badge badge-ok">Aktywny</span>'
             : '<span class="badge badge-nok">Nieaktywny</span>';
         const lastLogin = u.last_login ? new Date(u.last_login).toLocaleString('pl-PL') : '—';
-        const toggleLabel = u.is_active ? 'Dezaktywuj' : 'Aktywuj';
-        const toggleStyle = u.is_active
-            ? 'padding:.3rem .6rem;font-size:.75rem;border:1px solid #fca5a5;border-radius:.35rem;background:#fff;color:#dc2626;cursor:pointer;'
-            : 'padding:.3rem .6rem;font-size:.75rem;border:1px solid #86efac;border-radius:.35rem;background:#fff;color:#16a34a;cursor:pointer;';
+        const toggleIcon = u.is_active ? 'person_off' : 'person';
+        const toggleTitle = u.is_active ? 'Dezaktywuj' : 'Aktywuj';
+        const toggleColor = u.is_active ? '#dc2626' : '#16a34a';
+        const toggleBorder = u.is_active ? '#fca5a5' : '#86efac';
 
         return `<tr class="table-row-hover">
             <td><strong>${escHtml(u.full_name)}</strong></td>
@@ -107,14 +107,17 @@ function renderUsers(users) {
             <td>${statusBadge}</td>
             <td style="color:var(--color-ink-subtle);">${lastLogin}</td>
             <td style="text-align:right;display:flex;gap:.4rem;justify-content:flex-end;padding:.5rem 1rem;">
-                <a href="/system/users/${u.id}/edit"
-                   style="padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--color-border);border-radius:.35rem;background:#fff;color:var(--color-ink-muted);text-decoration:none;">
-                   Edytuj
+                <a href="/system/users/${u.id}/edit" title="Edytuj"
+                   style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">
+                   <span class="material-icons" style="font-size:16px;">edit</span>
                 </a>
-                <button onclick="toggleActive(${u.id})" style="${toggleStyle}">${toggleLabel}</button>
-                <button onclick="openResetPwModal(${u.id}, '${escHtml(u.full_name)}')"
-                        style="padding:.3rem .6rem;font-size:.75rem;border:1px solid #bfdbfe;border-radius:.35rem;background:#fff;color:#1d4ed8;cursor:pointer;">
-                    Reset hasła
+                <button onclick="toggleActive(${u.id})" title="${toggleTitle}"
+                        style="width:30px;height:30px;border:1px solid ${toggleBorder};border-radius:2px;background:#fff;color:${toggleColor};cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">
+                    <span class="material-icons" style="font-size:16px;">${toggleIcon}</span>
+                </button>
+                <button onclick="openResetPwModal(${u.id}, '${escHtml(u.full_name)}')" title="Reset hasła"
+                        style="width:30px;height:30px;border:1px solid #bfdbfe;border-radius:2px;background:#fff;color:#1d4ed8;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">
+                    <span class="material-icons" style="font-size:16px;">lock_reset</span>
                 </button>
             </td>
         </tr>`;

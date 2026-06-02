@@ -82,6 +82,13 @@ function dayDiff(a, b) { return Math.round((b - a) / 86400000); }
 function dateToX(date) { return dayDiff(rangeStart, date) * pxDay; }
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 function mondayOnOrBefore(d) { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+function isoWeek(d) {
+    const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = tmp.getUTCDay() || 7;
+    tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+    return Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
+}
 function escHtml(str) {
     if (str === null || str === undefined) return '';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -90,6 +97,13 @@ function escHtml(str) {
 async function loadGantt() {
     const data = await fetch(`/timeline/api/${ITEM_ID}`).then(r => r.json());
     allDated = (data.subtasks || []).filter(s => s.start_date || s.finish_date);
+    allDated.sort((a, b) => {
+        const sa = a.start_date || '', sb = b.start_date || '';
+        if (!sa && sb) return 1;
+        if (sa && !sb) return -1;
+        if (sa !== sb) return sa < sb ? -1 : 1;
+        return a.id - b.id;
+    });
     if (!allDated.length) {
         document.getElementById('g-empty').style.display = 'block';
         document.getElementById('gantt-wrap').style.display = 'none';
@@ -123,7 +137,7 @@ function buildTicks(totalDays) {
     } else if (currentUnit === 'weeks') {
         for (let i = 0; i < totalDays; i += 7) {
             const d = new Date(rangeStart); d.setDate(d.getDate() + i);
-            ticks.push({ x: i * pxDay, label: `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`, major: false });
+            ticks.push({ x: i * pxDay, label: `KW ${isoWeek(d)}`, major: false });
         }
     } else { // months
         let d = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);

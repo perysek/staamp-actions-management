@@ -222,15 +222,6 @@
 
         <!-- Nav -->
         <nav class="sidebar-nav scrollbar-thin">
-            {% if current_user.is_authenticated %}
-            <a href="{{ url_for('main.index') }}"
-               class="sidebar-link {% if request.endpoint == 'main.index' %}active{% endif %}"
-               {% if request.endpoint == 'main.index' %}aria-current="page"{% endif %}>
-                <span class="material-icons">dashboard</span>
-                Pulpit
-            </a>
-            {% endif %}
-
             <div class="sidebar-section-label">Działania</div>
             {% if user_permissions.actions %}
             <a href="{{ url_for('items.items_list') }}"
@@ -239,14 +230,6 @@
                 Działania
             </a>
             {% endif %}
-            {% if user_permissions.timeline %}
-            <a href="{{ url_for('timeline.timeline_index') }}"
-               class="sidebar-link {% if request.blueprint == 'timeline' %}active{% endif %}">
-                <span class="material-icons">timeline</span>
-                Oś czasu
-            </a>
-            {% endif %}
-
             {% if current_user.is_authenticated and current_user.role == 'superuser' %}
             <div class="sidebar-section-label" style="margin-top:.5rem;">System</div>
             <a href="{{ url_for('users.users_list') }}"

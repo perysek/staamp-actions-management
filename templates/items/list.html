@@ -26,12 +26,12 @@
                 <thead>
                     <tr>
                         <th class="no-sort">Typ</th>
-                        <th class="no-sort">Tytuł</th>
+                        <th class="no-sort" style="min-width:220px;">Tytuł</th>
                         <th class="no-sort">Status</th>
                         <th class="no-sort">Termin</th>
                         <th class="no-sort">Odpowiedzialni</th>
                         <th class="no-sort">Podzadania</th>
-                        <th class="no-sort"></th>
+                        <th class="no-sort" style="width:100px;"></th>
                     </tr>
                 </thead>
                 <tbody id="items-body"></tbody>
@@ -84,10 +84,10 @@ function renderItems(items) {
         const typeLabel = escHtml(TYPE_LABELS[it.item_type] || it.item_type);
         const due = it.due_date ? `<span style="font-family:monospace;">${escHtml(it.due_date)}</span>` : '<span style="color:var(--color-ink-subtle);">—</span>';
         const resp = it.responsibles ? escHtml(it.responsibles) : '<span style="color:var(--color-ink-subtle);">—</span>';
-        let actions = `<a href="/items/${it.id}" style="padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;">Szczegóły</a>`;
+        let actions = `<a href="/items/${it.id}" title="Szczegóły" style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:16px;">visibility</span></a>`;
         if (canManage) {
-            actions += ` <a href="/items/${it.id}/edit" style="padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;">Edytuj</a>`;
-            actions += ` <button onclick="deleteItem(${it.id}, '${escHtml(it.title).replace(/'/g, "\\'")}')" style="padding:.3rem .6rem;font-size:.75rem;border:1px solid #fca5a5;border-radius:2px;background:#fff;color:#dc2626;cursor:pointer;">Usuń</button>`;
+            actions += ` <a href="/items/${it.id}/edit" title="Edytuj" style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:16px;">edit</span></a>`;
+            actions += ` <button onclick="deleteItem(${it.id}, '${escHtml(it.title).replace(/'/g, "\\'")}')" title="Usuń" style="width:30px;height:30px;border:1px solid #fca5a5;border-radius:2px;background:#fff;color:#dc2626;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:16px;">delete</span></button>`;
         }
         return `<tr class="table-row-hover">
             <td>${typeLabel}</td>

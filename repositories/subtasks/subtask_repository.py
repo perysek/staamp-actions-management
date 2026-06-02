@@ -10,7 +10,10 @@ class SubtaskRepository:
             FROM subtasks s
             LEFT JOIN users u ON u.id = s.responsible_user_id
             WHERE s.item_id = ?
-            ORDER BY s.sort_order, s.id
+            ORDER BY CASE WHEN s.start_date IS NULL OR s.start_date = '' THEN 1 ELSE 0 END,
+                     s.start_date,
+                     s.created_at,
+                     s.id
         """
         with get_connection() as conn:
             return conn.execute(query, (item_id,)).fetchall()

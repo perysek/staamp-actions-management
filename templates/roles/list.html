@@ -21,11 +21,11 @@
             <table class="refined-table" id="roles-table" style="display:none;">
                 <thead>
                     <tr>
-                        <th class="no-sort">Nazwa systemowa</th>
+                        <th class="no-sort" style="min-width:160px;">Nazwa systemowa</th>
                         <th class="no-sort">Wyświetlana nazwa</th>
                         <th class="no-sort">Dostęp do modułów</th>
                         <th class="no-sort">Typ</th>
-                        <th class="no-sort"></th>
+                        <th class="no-sort" style="width:80px;"></th>
                     </tr>
                 </thead>
                 <tbody id="roles-body"></tbody>
@@ -68,8 +68,8 @@ function renderRoles(roles) {
             ? '<span class="badge badge-na" style="font-size:.65rem;">Systemowa</span>' : '';
         const deleteBtn = r.is_protected ? '' :
             `<button onclick="deleteRole(${r.id}, '${r.display_name.replace("'","")}')"
-                     style="padding:.3rem .6rem;font-size:.75rem;border:1px solid #fca5a5;border-radius:.35rem;background:#fff;color:#dc2626;cursor:pointer;">
-                Usuń
+                     title="Usuń" style="width:30px;height:30px;border:1px solid #fca5a5;border-radius:2px;background:#fff;color:#dc2626;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">
+                <span class="material-icons" style="font-size:16px;">delete</span>
             </button>`;
 
         return `<tr class="table-row-hover">
@@ -78,9 +78,9 @@ function renderRoles(roles) {
             <td style="padding:.6rem 1rem;">${moduleDots}</td>
             <td>${protectedBadge}</td>
             <td style="text-align:right;display:flex;gap:.4rem;justify-content:flex-end;padding:.5rem 1rem;">
-                <a href="/system/roles/${r.id}/edit"
-                   style="padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--color-border);border-radius:.35rem;background:#fff;color:var(--color-ink-muted);text-decoration:none;">
-                    Edytuj uprawnienia
+                <a href="/system/roles/${r.id}/edit" title="Edytuj uprawnienia"
+                   style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">
+                    <span class="material-icons" style="font-size:16px;">edit</span>
                 </a>
                 ${deleteBtn}
             </td>
