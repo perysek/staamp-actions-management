@@ -79,6 +79,14 @@
         .sidebar-link .material-icons { font-size:22px; }
         .sidebar-footer { padding:.75rem 1rem; border-top:1px solid var(--sidebar-border); background:var(--sidebar-bg-deep); font-size:.9rem; color:var(--sidebar-text); }
 
+        /* ── Language toggle (bottom-right of sidebar) ─── */
+        .lang-switch { display:flex; justify-content:flex-end; margin-top:.65rem; }
+        .lang-toggle { display:inline-flex; align-items:center; gap:.12rem; padding:2px 3px 2px 7px; border:1px solid var(--sidebar-border); border-radius:9999px; background:rgba(148,163,184,.08); }
+        .lang-toggle > .material-icons { font-size:15px; color:var(--sidebar-text); margin-right:.12rem; }
+        .lang-opt { font-family:var(--font-body); font-size:.7rem; font-weight:600; letter-spacing:.05em; line-height:1; padding:3px 8px; border:none; border-radius:9999px; background:transparent; color:var(--sidebar-text); cursor:pointer; transition:background .15s ease,color .15s ease; }
+        .lang-opt:hover { color:var(--sidebar-text-hover); }
+        .lang-opt.active { background:var(--color-accent); color:#fff; }
+
         /* ── Page layout classes ─── */
         .refined-page { padding:1rem 1.5rem; display:flex; flex-direction:column; height:100%; }
         .page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1rem; gap:1rem; }
@@ -280,6 +288,15 @@
             {% else %}
             <div class="text-xs" style="color:#475569;">v{{ app_version }} — STAAMP Actions</div>
             {% endif %}
+
+            <!-- Language toggle (Polish ⇄ English) -->
+            <div class="lang-switch">
+                <div class="lang-toggle" role="group" aria-label="Język interfejsu / Interface language">
+                    <span class="material-icons" aria-hidden="true">translate</span>
+                    <button type="button" class="lang-opt" data-lang="pl" onclick="I18n.set('pl')" title="Polski">PL</button>
+                    <button type="button" class="lang-opt" data-lang="en" onclick="I18n.set('en')" title="English">EN</button>
+                </div>
+            </div>
         </div>
     </aside>
 
@@ -348,6 +365,7 @@
 <script src="{{ url_for('static', filename='js/table-utils.js') }}"></script>
 <script src="{{ url_for('static', filename='js/searchable-select.js') }}"></script>
 <script src="{{ url_for('static', filename='js/keyboard-shortcuts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
 
 <script>
 function toggleSidebar() {

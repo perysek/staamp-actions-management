@@ -130,7 +130,7 @@ async function toggleActive(userId) {
     const resp = await fetch(`/system/users/api/${userId}/toggle-active`, { method: 'PUT' });
     const data = await resp.json();
     if (data.success) loadUsers();
-    else alert(data.error || 'Błąd');
+    else Notifications.error(data.error || 'Błąd');
 }
 
 function openResetPwModal(userId, userName) {

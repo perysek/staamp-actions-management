@@ -243,12 +243,18 @@ async function submitModal() {
     }
 }
 
-async function deleteEmployee(empId, lastName) {
-    if (!confirm(`Usunąć pracownika "${lastName}"?`)) return;
-    const resp = await fetch(`/system/employees/api/${empId}`, { method: 'DELETE' });
-    const data = await resp.json();
-    if (data.success) loadEmployees();
-    else alert(data.error || 'Błąd usuwania');
+function deleteEmployee(empId, lastName) {
+    Modals.confirm({
+        title: 'Usuń pracownika',
+        message: `Usunąć pracownika „${lastName}”?`,
+        confirmText: 'Usuń', cancelText: 'Anuluj', type: 'danger',
+        onConfirm: async () => {
+            const resp = await fetch(`/system/employees/api/${empId}`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) { Notifications.success('Usunięto pracownika'); loadEmployees(); }
+            else Notifications.error(data.error || 'Błąd usuwania');
+        },
+    });
 }
 
 /* Search */
