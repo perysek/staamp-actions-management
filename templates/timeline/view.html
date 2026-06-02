@@ -137,7 +137,7 @@ function buildTicks(totalDays) {
     } else if (currentUnit === 'weeks') {
         for (let i = 0; i < totalDays; i += 7) {
             const d = new Date(rangeStart); d.setDate(d.getDate() + i);
-            ticks.push({ x: i * pxDay, label: `KW ${isoWeek(d)}`, major: false });
+            ticks.push({ x: i * pxDay, label: `CW ${isoWeek(d)}`, major: false });
         }
     } else { // months
         let d = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
