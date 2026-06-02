@@ -290,7 +290,7 @@ function openDateEditor(sid, barEl) {
     const panel = document.createElement('div');
     panel.style.cssText = 'position:fixed;background:#fff;border-radius:3px;border:1px solid rgba(0,0,0,.06);box-shadow:0 8px 28px rgba(0,0,0,.28),0 2px 8px rgba(0,0,0,.18);padding:12px;width:220px;';
     panel.innerHTML = `
-        <div style="font-size:.78rem;font-weight:600;margin-bottom:8px;">${escHtml(s.title)}</div>
+        <div style="font-size:.78rem;font-weight:600;margin-bottom:8px;">Edytuj daty</div>
         <label style="display:block;font-size:.72rem;color:var(--color-ink-muted);margin-bottom:2px;">Start</label>
         <input id="gd-start" type="date" value="${s.start_date || ''}" style="width:100%;font-size:.8rem;padding:4px 6px;border:1px solid var(--color-border);border-radius:2px;margin-bottom:9px;font-family:inherit;box-sizing:border-box;">
         <label style="display:block;font-size:.72rem;color:var(--color-ink-muted);margin-bottom:2px;">Koniec</label>

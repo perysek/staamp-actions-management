@@ -166,6 +166,7 @@
         'Dni': 'Days',
         'Tygodnie': 'Weeks',
         'Miesiące': 'Months',
+        'Edytuj daty': 'Edit dates',
 
         /* Users */
         'Zarządzanie kontami użytkowników systemu': 'Management of system user accounts',
