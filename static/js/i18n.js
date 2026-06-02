@@ -87,6 +87,8 @@
         'Typ': 'Type',
         'Tytuł': 'Title',
         'Termin': 'Due date',
+        'Termin się zbliża': 'Due date approaching',
+        'Termin przekroczony': 'Overdue',
         'Odpowiedzialni': 'Responsible',
         'Odpowiedzialny': 'Responsible',
         'Podzadania': 'Subtasks',

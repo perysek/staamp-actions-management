@@ -1,4 +1,6 @@
+import math
 import re
+from datetime import date, timedelta
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
@@ -28,6 +30,59 @@ SUBTASK_STATUS_OPTIONS = [('not_started', 'Nie rozpoczęte'), ('in_progress', 'W
 ITEM_TYPES = [v for v, _ in ITEM_TYPE_OPTIONS]
 ITEM_STATUSES = [v for v, _ in ITEM_STATUS_OPTIONS]
 SUBTASK_STATUSES = [v for v, _ in SUBTASK_STATUS_OPTIONS]
+
+
+# ── Due-date warning indicator ────────────────────────────────────────────────
+# Terminal statuses never warn — a finished/cancelled action is not "late".
+_WARN_SUPPRESSED_STATUSES = ('done', 'cancelled')
+
+
+def _parse_ymd(value):
+    """'YYYY-MM-DD' (optionally with a trailing ' HH:MM:SS') → date, parsed as a
+    LOCAL calendar date. Returns None for empty/malformed values. Avoids the
+    new Date('YYYY-MM-DD')-as-UTC pitfall by never going through a tz-aware path."""
+    if not value:
+        return None
+    parts = str(value)[:10].split('-')
+    if len(parts) != 3:
+        return None
+    try:
+        return date(int(parts[0]), int(parts[1]), int(parts[2]))
+    except (ValueError, TypeError):
+        return None
+
+
+def _due_warning(due_date, earliest_start, created_at, status) -> str:
+    """Warning level shown after the date in the actions list 'Termin' column.
+
+    finish-date = the action's due_date (the value displayed in the column).
+    start-date  = earliest subtask start_date, falling back to the action's
+                  created_at when it has no scheduled subtasks.
+
+      'overdue' (red)  — today is past the finish date.
+      'soon'    (yellow) — today is within the final 10% of the start→finish
+                  span, and that span is longer than 2 days (short-lived
+                  actions never warn). The finish day itself counts as 'soon'.
+      'none'    — otherwise, or for done/cancelled actions.
+    """
+    if status in _WARN_SUPPRESSED_STATUSES:
+        return 'none'
+    finish = _parse_ymd(due_date)
+    if finish is None:
+        return 'none'
+    today = date.today()
+    if today > finish:
+        return 'overdue'
+    start = _parse_ymd(earliest_start) or _parse_ymd(created_at)
+    if start is None:
+        return 'none'
+    span = (finish - start).days
+    if span <= 2:
+        return 'none'
+    warn_window = math.ceil(span * 0.1)
+    if today >= finish - timedelta(days=warn_window):
+        return 'soon'
+    return 'none'
 
 
 def _subtask_to_dict(row) -> dict:
@@ -111,6 +166,8 @@ def api_list():
         'id': r['id'], 'item_type': r['item_type'], 'title': r['title'],
         'status': r['status'], 'due_date': r['due_date'],
         'subtask_count': r['subtask_count'], 'responsibles': r['responsibles'],
+        'due_warning': _due_warning(r['due_date'], r['earliest_start'],
+                                    r['created_at'], r['status']),
     } for r in rows]
     return jsonify({'items': items, 'count': len(items)})
 

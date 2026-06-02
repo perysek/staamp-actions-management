@@ -6,6 +6,9 @@ _LIST_SELECT = """
     SELECT i.id, i.item_type, i.title, i.description, i.status, i.due_date,
            i.created_by, i.created_at, i.updated_at,
            (SELECT COUNT(*) FROM subtasks s WHERE s.item_id = i.id) AS subtask_count,
+           (SELECT MIN(s.start_date) FROM subtasks s
+             WHERE s.item_id = i.id AND s.start_date IS NOT NULL AND s.start_date != '')
+             AS earliest_start,
            (SELECT GROUP_CONCAT(u.full_name, ', ')
               FROM item_responsibles ir JOIN users u ON u.id = ir.user_id
              WHERE ir.item_id = i.id) AS responsibles
