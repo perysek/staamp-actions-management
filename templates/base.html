@@ -247,6 +247,11 @@
                 <span class="material-icons">admin_panel_settings</span>
                 Role i uprawnienia
             </a>
+            <a href="{{ url_for('action_plans.plans_list') }}"
+               class="sidebar-link {% if request.blueprint == 'action_plans' %}active{% endif %}">
+                <span class="material-icons">account_tree</span>
+                Plany działań
+            </a>
             {% endif %}
             {% if user_permissions.audit %}
             <a href="{{ url_for('audit.audit_list') }}"

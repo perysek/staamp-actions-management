@@ -1,9 +1,10 @@
 from typing import Any, Optional
 from database.db import get_connection
 
-# Shared SELECT — items enriched with subtask count + comma-joined responsible names.
+# Shared SELECT — items enriched with action-plan name, subtask count + responsible names.
 _LIST_SELECT = """
-    SELECT i.id, i.item_type, i.title, i.description, i.status, i.due_date,
+    SELECT i.id, i.item_type, i.action_plan_id, p.name AS plan_name,
+           i.title, i.description, i.status, i.due_date,
            i.created_by, i.created_at, i.updated_at,
            (SELECT COUNT(*) FROM subtasks s WHERE s.item_id = i.id) AS subtask_count,
            (SELECT MIN(s.start_date) FROM subtasks s
@@ -13,6 +14,7 @@ _LIST_SELECT = """
               FROM item_responsibles ir JOIN users u ON u.id = ir.user_id
              WHERE ir.item_id = i.id) AS responsibles
     FROM items i
+    LEFT JOIN action_plans p ON p.id = i.action_plan_id
 """
 
 _LIST_ORDER = " ORDER BY (i.due_date IS NULL), i.due_date, i.id DESC"
@@ -39,28 +41,35 @@ class ItemRepository:
             return conn.execute(query, (user_id, user_id)).fetchall()
 
     def get_by_id(self, item_id: int) -> Optional[Any]:
+        """Returns all item columns plus the resolved action-plan name (plan_name)."""
         with get_connection() as conn:
-            return conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+            return conn.execute(
+                """SELECT i.*, p.name AS plan_name
+                   FROM items i
+                   LEFT JOIN action_plans p ON p.id = i.action_plan_id
+                   WHERE i.id = ?""",
+                (item_id,),
+            ).fetchone()
 
-    def create(self, item_type: str, title: str, description: Optional[str],
+    def create(self, action_plan_id: int, title: str, description: Optional[str],
                status: str, due_date: Optional[str], created_by: Optional[int]) -> int:
         with get_connection() as conn:
             cursor = conn.execute(
-                """INSERT INTO items (item_type, title, description, status, due_date, created_by)
+                """INSERT INTO items (action_plan_id, title, description, status, due_date, created_by)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (item_type, title.strip(), description, status, due_date or None, created_by),
+                (action_plan_id, title.strip(), description, status, due_date or None, created_by),
             )
             return cursor.lastrowid
 
-    def update(self, item_id: int, item_type: str, title: str, description: Optional[str],
+    def update(self, item_id: int, action_plan_id: int, title: str, description: Optional[str],
                status: str, due_date: Optional[str]):
         with get_connection() as conn:
             conn.execute(
                 """UPDATE items
-                   SET item_type = ?, title = ?, description = ?, status = ?,
+                   SET action_plan_id = ?, title = ?, description = ?, status = ?,
                        due_date = ?, updated_at = CURRENT_TIMESTAMP
                    WHERE id = ?""",
-                (item_type, title.strip(), description, status, due_date or None, item_id),
+                (action_plan_id, title.strip(), description, status, due_date or None, item_id),
             )
 
     def delete(self, item_id: int) -> bool:

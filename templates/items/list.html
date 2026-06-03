@@ -19,7 +19,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Działania</h1>
-            <p class="page-subtitle">Zadania, projekty, działania i cele</p>
+            <p class="page-subtitle">Działania pogrupowane według planów</p>
         </div>
         <div style="display:flex;align-items:center;gap:.75rem;">
             <input type="text" id="search-input" placeholder="Szukaj…"
@@ -37,7 +37,7 @@
             <table class="refined-table" id="items-table" style="display:none;">
                 <thead>
                     <tr>
-                        <th class="no-sort">Typ</th>
+                        <th class="no-sort">Plan działań</th>
                         <th class="no-sort" style="width:34%;min-width:150px;">Tytuł</th>
                         <th class="no-sort">Status</th>
                         <th class="no-sort" style="min-width:120px;">Termin</th>
@@ -57,7 +57,6 @@
 <script>
 const canManage = {{ 'true' if current_user.role in ['superuser', 'manager'] else 'false' }};
 
-const TYPE_LABELS = { task:'Zadanie', project:'Projekt', action:'Działanie', goal:'Cel' };
 const STATUS_LABELS = { open:'Otwarte', in_progress:'W toku', on_hold:'Wstrzymane', done:'Zakończone', cancelled:'Anulowane' };
 const STATUS_BADGE = {
     open:        'background:#eff6ff;color:#1e40af;',
@@ -93,7 +92,7 @@ function renderItems(items) {
 
     document.getElementById('items-body').innerHTML = items.map(it => {
         const statusBadge = `<span class="badge" style="${STATUS_BADGE[it.status] || ''}">${escHtml(STATUS_LABELS[it.status] || it.status)}</span>`;
-        const typeLabel = escHtml(TYPE_LABELS[it.item_type] || it.item_type);
+        const planLabel = escHtml(it.plan_name || '—');
         let dueWarn = '';
         if (it.due_warning === 'overdue')
             dueWarn = `<span class="material-icons due-warn overdue" title="Termin przekroczony">error</span>`;
@@ -109,7 +108,7 @@ function renderItems(items) {
             actions += ` <button onclick="deleteItem(${it.id}, '${escHtml(it.title).replace(/'/g, "\\'")}')" title="Usuń" style="width:30px;height:30px;border:1px solid #fca5a5;border-radius:2px;background:#fff;color:#dc2626;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:16px;">delete</span></button>`;
         }
         return `<tr class="table-row-hover">
-            <td>${typeLabel}</td>
+            <td>${planLabel}</td>
             <td><a href="/items/${it.id}" class="item-title-clamp" title="${escHtml(it.title)}">${escHtml(it.title)}</a></td>
             <td>${statusBadge}</td>
             <td class="due-cell">${due}</td>
@@ -138,6 +137,7 @@ document.getElementById('search-input').addEventListener('input', function () {
     const q = this.value.toLowerCase();
     renderItems(allItems.filter(it =>
         (it.title || '').toLowerCase().includes(q) ||
+        (it.plan_name || '').toLowerCase().includes(q) ||
         (STATUS_LABELS[it.status] || '').toLowerCase().includes(q) ||
         (it.responsibles || '').toLowerCase().includes(q)
     ));

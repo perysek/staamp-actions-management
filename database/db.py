@@ -117,7 +117,18 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS ix_audit_occurred ON audit_log(occurred_at DESC);
 CREATE INDEX IF NOT EXISTS ix_audit_user     ON audit_log(user_id);
 
--- ── Domain: items (task|project|action|goal) ───────────────────────────
+-- ── Action plans (user-managed grouping; replaces the old item_type vocab) ──
+CREATE TABLE IF NOT EXISTS action_plans (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,                 -- ≤200 chars (enforced app-side)
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_action_plans_name ON action_plans(name COLLATE NOCASE);
+
+-- ── Domain: items (each linked to one action_plan) ─────────────────────────
 CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     item_type   TEXT NOT NULL DEFAULT 'action',
@@ -164,6 +175,10 @@ def initialize_database() -> None:
             # Dependency feature removed — drop its table/column where present (best-effort).
             "DROP TABLE IF EXISTS subtask_dependencies",
             "ALTER TABLE subtasks DROP COLUMN dependency_logic",
+            # Action plans: link each item to a plan (nullable at DB level; NOT NULL enforced
+            # in the app). Backfilled by _seed_action_plans(). Old item_type column is left
+            # in place but unused.
+            "ALTER TABLE items ADD COLUMN action_plan_id INTEGER REFERENCES action_plans(id)",
         ]
         for sql in migrations:
             try:
@@ -172,6 +187,7 @@ def initialize_database() -> None:
                 pass
 
     _seed_roles_and_permissions()
+    _seed_action_plans()
 
 
 def _seed_roles_and_permissions() -> None:
@@ -211,3 +227,30 @@ def _seed_roles_and_permissions() -> None:
                         "INSERT OR IGNORE INTO role_permissions (role_id, module_name, has_access) VALUES (?, ?, ?)",
                         (row['id'], module, has_access),
                     )
+
+
+def _seed_action_plans() -> None:
+    """ONE-TIME: seed two starter plans and link any pre-existing items, then stay inert.
+
+    Unlike roles (fixed reference data seeded with INSERT OR IGNORE), action plans are
+    *user data* — re-seeding by name would re-create a duplicate after the user renames
+    a plan. So the guard is table-emptiness, NOT name: once any plan exists, this is a no-op.
+
+      • 'Ogólne działania 2026'   — general catch-all bucket for standalone items (starts empty).
+      • 'Przegląd zarządzania 2026' — receives the pre-existing items (legacy item_type='action').
+    """
+    with get_connection() as conn:
+        if conn.execute("SELECT COUNT(*) AS c FROM action_plans").fetchone()['c'] > 0:
+            return  # already initialised / user-managed
+        conn.execute(
+            "INSERT INTO action_plans (name, sort_order) VALUES (?, ?)",
+            ('Ogólne działania 2026', 1),
+        )
+        cur = conn.execute(
+            "INSERT INTO action_plans (name, sort_order) VALUES (?, ?)",
+            ('Przegląd zarządzania 2026', 2),
+        )
+        conn.execute(
+            "UPDATE items SET action_plan_id = ? WHERE action_plan_id IS NULL",
+            (cur.lastrowid,),
+        )

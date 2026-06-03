@@ -16,7 +16,7 @@
         {% call form_section('Szczegóły', 'edit_note') %}
             {{ text_input('title', 'Tytuł', value=item['title'], required=True) }}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-                {{ select_input('item_type', 'Typ', item_type_options, value=item['item_type'], required=True) }}
+                {{ select_input('action_plan_id', 'Plan działań', plan_options, value=item['action_plan_id'], required=True) }}
                 {{ select_input('status', 'Status', item_status_options, value=item['status'], required=True) }}
             </div>
             {{ date_input('due_date', 'Termin', value=item['due_date'] or '') }}
@@ -52,7 +52,7 @@ document.getElementById('item-form').addEventListener('submit', async function (
     const responsibles = [...document.querySelectorAll('.resp-check:checked')].map(c => parseInt(c.value));
     const payload = {
         title,
-        item_type: document.getElementById('item_type').value,
+        action_plan_id: parseInt(document.getElementById('action_plan_id').value),
         status: document.getElementById('status').value,
         due_date: document.getElementById('due_date').value || null,
         description: document.getElementById('description').value || null,

@@ -8,7 +8,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Nowe działanie</h1>
-            <p class="page-subtitle">Utwórz zadanie, projekt, działanie lub cel</p>
+            <p class="page-subtitle">Utwórz działanie i przypisz je do planu</p>
         </div>
     </div>
 
@@ -16,9 +16,14 @@
         {% call form_section('Szczegóły', 'edit_note') %}
             {{ text_input('title', 'Tytuł', required=True, placeholder='Krótki tytuł działania') }}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-                {{ select_input('item_type', 'Typ', item_type_options, value='action', required=True) }}
+                {{ select_input('action_plan_id', 'Plan działań', plan_options, value=default_plan, required=True) }}
                 {{ select_input('status', 'Status', item_status_options, value='open', required=True) }}
             </div>
+            {% if not plan_options %}
+            <div style="padding:.5rem .75rem;background:#fdf9ed;border:1px solid #eddcaa;border-radius:2px;color:var(--color-warning);font-size:.78rem;">
+                Najpierw utwórz plan działań.
+            </div>
+            {% endif %}
             {{ date_input('due_date', 'Termin') }}
             {{ textarea_input('description', 'Opis', rows=5) }}
         {% endcall %}
@@ -37,21 +42,30 @@
             {% endif %}
         {% endcall %}
 
-        {{ form_actions('Utwórz', cancel_url=url_for('items.items_list')) }}
+        {{ form_actions('Utwórz', cancel_url=url_for('items.items_list'), submit_id='submit-btn') }}
     </form>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
+// No active plans → block submission (the action must belong to a plan).
+const planSelect = document.getElementById('action_plan_id');
+if (!planSelect || !planSelect.options.length) {
+    const btn = document.getElementById('submit-btn');
+    if (btn) { btn.disabled = true; btn.style.opacity = '.5'; btn.style.cursor = 'not-allowed'; }
+}
+
 document.getElementById('item-form').addEventListener('submit', async function (e) {
     e.preventDefault();
     const title = document.getElementById('title').value.trim();
     if (!title) { Notifications.error('Tytuł jest wymagany'); return; }
+    const planEl = document.getElementById('action_plan_id');
+    if (!planEl || !planEl.value) { Notifications.error('Najpierw utwórz plan działań'); return; }
     const responsibles = [...document.querySelectorAll('.resp-check:checked')].map(c => parseInt(c.value));
     const payload = {
         title,
-        item_type: document.getElementById('item_type').value,
+        action_plan_id: parseInt(planEl.value),
         status: document.getElementById('status').value,
         due_date: document.getElementById('due_date').value || null,
         description: document.getElementById('description').value || null,

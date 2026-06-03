@@ -77,11 +77,34 @@
         'Nie rozpoczęte': 'Not started',
         'Zablokowane': 'Blocked',
 
-        /* Type labels */
-        'Zadanie': 'Task',
-        'Projekt': 'Project',
-        'Działanie': 'Action',
-        'Cel': 'Goal',
+        /* Action plans (user-managed grouping; replaces the old fixed type labels).
+           Plan NAMES themselves are free-text DB values and are intentionally NOT
+           translated — only the page chrome below is. */
+        'Plany działań': 'Action Plans',
+        'Plan działań': 'Action Plan',
+        'Grupowanie działań według inicjatyw / obszarów': 'Grouping actions by initiative / area',
+        '+ Nowy plan': '+ New plan',
+        'Nowy plan działań': 'New action plan',
+        'Edytuj plan działań': 'Edit action plan',
+        'Zdefiniuj inicjatywę / obszar grupujący działania': 'Define an initiative / area grouping actions',
+        'Brak planów działań': 'No action plans',
+        'Nazwa': 'Name',
+        'Pozycje': 'Items',
+        'Kolejność': 'Order',
+        'maks. 200 znaków': 'max. 200 characters',
+        'kolejność na listach i w polach wyboru': 'order in lists and select fields',
+        'nieaktywne plany są ukryte przy tworzeniu działań': 'inactive plans are hidden when creating actions',
+        'Utwórz plan': 'Create plan',
+        'Usuń plan działań': 'Delete action plan',
+        'Usunięto plan': 'Plan deleted',
+        'Błąd usuwania planu': 'Error deleting plan',
+        'Błąd tworzenia planu działań.': 'Error creating action plan.',
+        'Plan działań nie istnieje': 'Action plan does not exist',
+        'Najpierw utwórz plan działań.': 'First create an action plan.',
+        'Najpierw utwórz plan działań': 'First create an action plan',
+        'Plan działań jest wymagany': 'Action plan is required',
+        'Nieprawidłowy plan działań': 'Invalid action plan',
+        'Nie można przypisać nieaktywnego planu działań': 'Cannot assign an inactive action plan',
 
         /* Table headers / field labels */
         'Typ': 'Type',
@@ -129,13 +152,13 @@
         'Szukaj...': 'Search...',
 
         /* Items: list / detail / form */
-        'Zadania, projekty, działania i cele': 'Tasks, projects, actions and goals',
+        'Działania pogrupowane według planów': 'Actions grouped by plans',
         'Szczegóły działania': 'Action details',
         'Pokaż oś czasu': 'Show timeline',
         'Odpowiedzialni (działanie)': 'Responsible (action)',
         'Nowe działanie': 'New action',
         'Edytuj działanie': 'Edit action',
-        'Utwórz zadanie, projekt, działanie lub cel': 'Create a task, project, action or goal',
+        'Utwórz działanie i przypisz je do planu': 'Create an action and assign it to a plan',
         'Krótki tytuł działania': 'Short action title',
         'Zaznacz osoby odpowiedzialne za to działanie.': 'Select the people responsible for this action.',
 

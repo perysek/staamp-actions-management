@@ -5,7 +5,6 @@
 {% set status_labels = {
     'open':'Otwarte','in_progress':'W toku','on_hold':'Wstrzymane','done':'Zakończone','cancelled':'Anulowane'
 } %}
-{% set type_labels = {'task':'Zadanie','project':'Projekt','action':'Działanie','goal':'Cel'} %}
 
 {% block content %}
 <div class="refined-page">
@@ -22,7 +21,7 @@
             <table class="refined-table">
                 <thead>
                     <tr>
-                        <th class="no-sort">Typ</th>
+                        <th class="no-sort">Plan działań</th>
                         <th class="no-sort">Tytuł</th>
                         <th class="no-sort">Status</th>
                         <th class="no-sort">Podzadania</th>
@@ -32,7 +31,7 @@
                 <tbody>
                     {% for it in items %}
                     <tr class="table-row-hover">
-                        <td>{{ type_labels.get(it.item_type, it.item_type) }}</td>
+                        <td>{{ it.plan_name }}</td>
                         <td><strong>{{ it.title }}</strong></td>
                         <td><span class="badge badge-na">{{ status_labels.get(it.status, it.status) }}</span></td>
                         <td style="text-align:center;">{{ it.subtask_count }}</td>

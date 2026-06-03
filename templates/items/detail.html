@@ -8,14 +8,13 @@
 {% set status_labels = {
     'open':'Otwarte','in_progress':'W toku','on_hold':'Wstrzymane','done':'Zakończone','cancelled':'Anulowane'
 } %}
-{% set type_labels = {'task':'Zadanie','project':'Projekt','action':'Działanie','goal':'Cel'} %}
 
 {% block content %}
 <div class="refined-page">
     <div class="page-header" style="flex-wrap:nowrap;">
         <div style="min-width:0;flex:1;">
             <div style="display:flex;align-items:center;gap:.6rem;min-width:0;">
-                <span class="badge badge-na" style="flex-shrink:0;">{{ type_labels.get(item['item_type'], item['item_type']) }}</span>
+                <span class="badge badge-na" style="flex-shrink:0;">{{ item['plan_name'] }}</span>
                 <h1 class="page-title" style="font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ item['title'] }}</h1>
             </div>
             <p class="page-subtitle">

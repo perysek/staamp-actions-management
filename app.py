@@ -40,6 +40,7 @@ def create_app() -> Flask:
     from routes.items.routes import items_bp
     from routes.timeline.routes import timeline_bp
     from routes.audit.routes import audit_bp
+    from routes.action_plans.routes import action_plans_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
@@ -49,6 +50,7 @@ def create_app() -> Flask:
     app.register_blueprint(items_bp)
     app.register_blueprint(timeline_bp)
     app.register_blueprint(audit_bp)
+    app.register_blueprint(action_plans_bp)
 
     @app.context_processor
     def inject_globals():

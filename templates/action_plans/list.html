@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Plany działań — {{ app_name }}{% endblock %}
+{% block page_heading %}Plany działań{% endblock %}
+
+{% block content %}
+<div class="refined-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Plany działań</h1>
+            <p class="page-subtitle">Grupowanie działań według inicjatyw / obszarów</p>
+        </div>
+        <a href="{{ url_for('action_plans.create_plan') }}"
+           style="padding:.5rem 1rem;background:var(--color-accent);color:#fff;border-radius:.5rem;font-size:.8125rem;font-weight:500;text-decoration:none;white-space:nowrap;">
+            + Nowy plan
+        </a>
+    </div>
+
+    <div class="table-container">
+        <div class="table-scroll-wrapper">
+            <div id="loading-state" style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Ładowanie…</div>
+            <div id="empty-state" style="display:none;padding:2rem;text-align:center;color:var(--color-ink-subtle);">Brak planów działań</div>
+            <table class="refined-table" id="plans-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th class="no-sort">Nazwa</th>
+                        <th class="no-sort" style="width:120px;text-align:center;">Pozycje</th>
+                        <th class="no-sort" style="width:130px;">Status</th>
+                        <th class="no-sort" style="width:90px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="plans-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function escHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function loadPlans() {
+    const resp = await fetch('{{ url_for("action_plans.api_list") }}');
+    const data = await resp.json();
+    renderPlans(data.plans || []);
+}
+
+function renderPlans(plans) {
+    document.getElementById('loading-state').style.display = 'none';
+    if (!plans.length) {
+        document.getElementById('empty-state').style.display = 'block';
+        document.getElementById('plans-table').style.display = 'none';
+        return;
+    }
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('plans-table').style.display = 'table';
+
+    document.getElementById('plans-body').innerHTML = plans.map(p => {
+        const statusBadge = p.is_active
+            ? '<span class="badge badge-ok">Aktywny</span>'
+            : '<span class="badge badge-na">Nieaktywny</span>';
+
+        // In-use plans cannot be deleted — show a disabled control with an explanatory tooltip.
+        const deleteBtn = p.usage_count > 0
+            ? `<span title="Nie można usunąć — w użyciu (${p.usage_count})"
+                     style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#f8fafc;color:var(--color-ink-subtle);display:inline-flex;align-items:center;justify-content:center;cursor:not-allowed;">
+                  <span class="material-icons" style="font-size:16px;">lock</span></span>`
+            : `<button onclick="deletePlan(${p.id}, '${escHtml(p.name).replace(/'/g, "\\'")}')"
+                      title="Usuń" style="width:30px;height:30px;border:1px solid #fca5a5;border-radius:2px;background:#fff;color:#dc2626;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">
+                  <span class="material-icons" style="font-size:16px;">delete</span></button>`;
+
+        return `<tr class="table-row-hover">
+            <td><strong>${escHtml(p.name)}</strong></td>
+            <td style="text-align:center;">${p.usage_count}</td>
+            <td>${statusBadge}</td>
+            <td style="text-align:right;display:flex;gap:.4rem;justify-content:flex-end;padding:.5rem 1rem;">
+                <a href="/system/action-plans/${p.id}/edit" title="Edytuj"
+                   style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">
+                    <span class="material-icons" style="font-size:16px;">edit</span>
+                </a>
+                ${deleteBtn}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function deletePlan(planId, name) {
+    Modals.confirm({
+        title: 'Usuń plan działań',
+        message: `Usunąć plan „${name}”?`,
+        confirmText: 'Usuń', cancelText: 'Anuluj', type: 'danger',
+        onConfirm: async () => {
+            const resp = await fetch(`/system/action-plans/api/${planId}`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) { Notifications.success('Usunięto plan'); loadPlans(); }
+            else Notifications.error(data.error || 'Błąd usuwania planu');
+        },
+    });
+}
+
+loadPlans();
+</script>
+{% endblock %}

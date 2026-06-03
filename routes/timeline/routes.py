@@ -21,7 +21,7 @@ def timeline_index():
     assigned_only = _role_repo.role_has_flag(current_user.role, 'actions_view_assigned_only')
     rows = _item_repo.get_for_user(current_user.id, assigned_only)
     items = [{
-        'id': r['id'], 'item_type': r['item_type'], 'title': r['title'],
+        'id': r['id'], 'plan_name': r['plan_name'], 'title': r['title'],
         'status': r['status'], 'due_date': r['due_date'], 'subtask_count': r['subtask_count'],
     } for r in rows]
     return render_template('timeline/index.html', items=items)

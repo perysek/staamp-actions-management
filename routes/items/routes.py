@@ -9,6 +9,7 @@ from config.auth_config import module_permission_required, manage_actions_requir
 from repositories.items.item_repository import ItemRepository
 from repositories.subtasks.subtask_repository import SubtaskRepository
 from repositories.roles.role_repository import RoleRepository
+from repositories.action_plans.action_plan_repository import ActionPlanRepository
 from database.db import log_event
 
 items_bp = Blueprint('items', __name__, url_prefix='/items')
@@ -16,10 +17,11 @@ items_bp = Blueprint('items', __name__, url_prefix='/items')
 _item_repo = ItemRepository()
 _subtask_repo = SubtaskRepository()
 _role_repo = RoleRepository()
+_plan_repo = ActionPlanRepository()
 
 # ── Domain vocabulary (value, Polish label) ──────────────────────────────────
-ITEM_TYPE_OPTIONS = [('task', 'Zadanie'), ('project', 'Projekt'),
-                     ('action', 'Działanie'), ('goal', 'Cel')]
+# Item types are no longer a fixed vocabulary — each item is linked to a user-managed
+# action_plan (see ActionPlanRepository). Status vocabularies remain fixed.
 ITEM_STATUS_OPTIONS = [('open', 'Otwarte'), ('in_progress', 'W toku'),
                        ('on_hold', 'Wstrzymane'), ('done', 'Zakończone'),
                        ('cancelled', 'Anulowane')]
@@ -27,7 +29,6 @@ SUBTASK_STATUS_OPTIONS = [('not_started', 'Nie rozpoczęte'), ('in_progress', 'W
                           ('blocked', 'Zablokowane'), ('done', 'Zakończone'),
                           ('cancelled', 'Anulowane')]
 
-ITEM_TYPES = [v for v, _ in ITEM_TYPE_OPTIONS]
 ITEM_STATUSES = [v for v, _ in ITEM_STATUS_OPTIONS]
 SUBTASK_STATUSES = [v for v, _ in SUBTASK_STATUS_OPTIONS]
 
@@ -134,8 +135,10 @@ def item_detail(item_id: int):
 @manage_actions_required
 def create_item():
     active_users = _item_repo.get_active_users()
+    plan_options = [(p['id'], p['name']) for p in _plan_repo.get_active()]
+    default_plan = plan_options[0][0] if plan_options else ''
     return render_template('items/create.html', active_users=active_users,
-                           item_type_options=ITEM_TYPE_OPTIONS,
+                           plan_options=plan_options, default_plan=default_plan,
                            item_status_options=ITEM_STATUS_OPTIONS)
 
 
@@ -149,9 +152,17 @@ def edit_item(item_id: int):
         return redirect(url_for('items.items_list'))
     active_users = _item_repo.get_active_users()
     responsible_ids = [r['id'] for r in _item_repo.get_responsibles(item_id)]
+    active_plans = _plan_repo.get_active()
+    plan_options = [(p['id'], p['name']) for p in active_plans]
+    # Keep the item's current plan selectable even if it has been retired (is_active=0),
+    # so saving doesn't silently re-assign the item to a different plan.
+    if item['action_plan_id'] not in [p['id'] for p in active_plans]:
+        current = _plan_repo.get_by_id(item['action_plan_id'])
+        if current:
+            plan_options.insert(0, (current['id'], current['name'] + ' (nieaktywny)'))
     return render_template('items/edit.html', item=item, active_users=active_users,
                            responsible_ids=responsible_ids,
-                           item_type_options=ITEM_TYPE_OPTIONS,
+                           plan_options=plan_options,
                            item_status_options=ITEM_STATUS_OPTIONS)
 
 
@@ -163,7 +174,7 @@ def api_list():
     assigned_only = _role_repo.role_has_flag(current_user.role, 'actions_view_assigned_only')
     rows = _item_repo.get_for_user(current_user.id, assigned_only)
     items = [{
-        'id': r['id'], 'item_type': r['item_type'], 'title': r['title'],
+        'id': r['id'], 'plan_name': r['plan_name'], 'title': r['title'],
         'status': r['status'], 'due_date': r['due_date'],
         'subtask_count': r['subtask_count'], 'responsibles': r['responsibles'],
         'due_warning': _due_warning(r['due_date'], r['earliest_start'],
@@ -178,13 +189,19 @@ def api_list():
 def api_create():
     data = request.get_json() or {}
     title = (data.get('title') or '').strip()
-    item_type = data.get('item_type', 'action')
     status = data.get('status', 'open')
     if not title:
         return jsonify({'success': False, 'error': 'Tytuł jest wymagany'}), 400
-    if item_type not in ITEM_TYPES or status not in ITEM_STATUSES:
-        return jsonify({'success': False, 'error': 'Nieprawidłowy typ lub status'}), 400
-    item_id = _item_repo.create(item_type, title, data.get('description'),
+    if status not in ITEM_STATUSES:
+        return jsonify({'success': False, 'error': 'Nieprawidłowy status'}), 400
+    try:
+        action_plan_id = int(data.get('action_plan_id'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Plan działań jest wymagany'}), 400
+    plan = _plan_repo.get_by_id(action_plan_id)
+    if not plan or not plan['is_active']:
+        return jsonify({'success': False, 'error': 'Nieprawidłowy plan działań'}), 400
+    item_id = _item_repo.create(action_plan_id, title, data.get('description'),
                                 status, data.get('due_date'), current_user.id)
     responsibles = data.get('responsibles') or []
     if responsibles:
@@ -204,13 +221,23 @@ def api_update(item_id: int):
         return jsonify({'success': False, 'error': 'Pozycja nie istnieje'}), 404
     data = request.get_json() or {}
     title = (data.get('title') or '').strip()
-    item_type = data.get('item_type', item['item_type'])
     status = data.get('status', item['status'])
     if not title:
         return jsonify({'success': False, 'error': 'Tytuł jest wymagany'}), 400
-    if item_type not in ITEM_TYPES or status not in ITEM_STATUSES:
-        return jsonify({'success': False, 'error': 'Nieprawidłowy typ lub status'}), 400
-    _item_repo.update(item_id, item_type, title, data.get('description'),
+    if status not in ITEM_STATUSES:
+        return jsonify({'success': False, 'error': 'Nieprawidłowy status'}), 400
+    try:
+        action_plan_id = int(data.get('action_plan_id', item['action_plan_id']))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Plan działań jest wymagany'}), 400
+    plan = _plan_repo.get_by_id(action_plan_id)
+    if not plan:
+        return jsonify({'success': False, 'error': 'Nieprawidłowy plan działań'}), 400
+    # Allow keeping the current (possibly retired) plan; block switching TO an inactive one.
+    if not plan['is_active'] and action_plan_id != item['action_plan_id']:
+        return jsonify({'success': False,
+                        'error': 'Nie można przypisać nieaktywnego planu działań'}), 400
+    _item_repo.update(item_id, action_plan_id, title, data.get('description'),
                       status, data.get('due_date'))
     if 'responsibles' in data:
         _item_repo.set_responsibles(item_id, data.get('responsibles') or [])

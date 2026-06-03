@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Nowy plan działań — {{ app_name }}{% endblock %}
+{% block page_heading %}Nowy plan działań{% endblock %}
+
+{% block extra_css %}
+<style>
+    .toggle { position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0; }
+    .toggle input { opacity:0;width:0;height:0; }
+    .toggle-slider { position:absolute;inset:0;background:#d1d5db;border-radius:11px;transition:.2s; }
+    .toggle-slider::before { content:"";position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s; }
+    input:checked + .toggle-slider { background:var(--color-accent); }
+    input:checked + .toggle-slider::before { transform:translateX(18px); }
+    .ap-row { display:flex;align-items:center;justify-content:space-between;padding:.75rem 0;border-top:1px solid var(--color-border-subtle); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="refined-page" style="max-width:620px;">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Nowy plan działań</h1>
+            <p class="page-subtitle">Zdefiniuj inicjatywę / obszar grupujący działania</p>
+        </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--color-border);border-radius:.75rem;padding:1.5rem;">
+        <div id="error-msg" style="display:none;padding:.625rem .875rem;background:#fdf3f3;border:1px solid #f0c8c8;border-radius:.5rem;color:#9b2c2c;font-size:.8rem;margin-bottom:1rem;"></div>
+
+        <form id="create-form" style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+                <label style="display:block;font-size:.8rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.3rem;">Nazwa *</label>
+                <input type="text" id="name" required maxlength="200"
+                       placeholder="np. Działania korygujące — audyt IATF 2026"
+                       style="width:100%;padding:.6rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;font-family:inherit;background:#fafafa;outline:none;">
+                <p style="font-size:.7rem;color:var(--color-ink-subtle);margin:.25rem 0 0;">maks. 200 znaków</p>
+            </div>
+
+            <div>
+                <label style="display:block;font-size:.8rem;font-weight:500;color:var(--color-ink-muted);margin-bottom:.3rem;">Kolejność</label>
+                <input type="number" id="sort_order" value="0" step="1"
+                       style="width:100%;padding:.6rem .875rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;font-family:inherit;background:#fafafa;outline:none;">
+                <p style="font-size:.7rem;color:var(--color-ink-subtle);margin:.25rem 0 0;">kolejność na listach i w polach wyboru</p>
+            </div>
+
+            <div class="ap-row">
+                <div>
+                    <div style="font-size:.875rem;font-weight:500;">Aktywny</div>
+                    <div style="font-size:.7rem;color:var(--color-ink-subtle);">nieaktywne plany są ukryte przy tworzeniu działań</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="is_active" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div style="display:flex;gap:.75rem;margin-top:.5rem;">
+                <button type="submit"
+                        style="padding:.65rem 1.25rem;background:var(--color-accent);color:#fff;border:none;border-radius:.5rem;font-size:.875rem;font-weight:500;cursor:pointer;font-family:inherit;">
+                    Utwórz plan
+                </button>
+                <a href="{{ url_for('action_plans.plans_list') }}"
+                   style="padding:.65rem 1rem;border:1px solid var(--color-border);border-radius:.5rem;font-size:.875rem;color:var(--color-ink-muted);text-decoration:none;">
+                    Anuluj
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('create-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const errDiv = document.getElementById('error-msg');
+    errDiv.style.display = 'none';
+
+    const payload = {
+        name: document.getElementById('name').value.trim(),
+        sort_order: parseInt(document.getElementById('sort_order').value) || 0,
+        is_active: document.getElementById('is_active').checked,
+    };
+
+    const resp = await fetch('{{ url_for("action_plans.api_create") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.success) {
+        window.location.href = '{{ url_for("action_plans.plans_list") }}';
+    } else {
+        errDiv.textContent = data.error || 'Błąd tworzenia planu działań.';
+        errDiv.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}
