@@ -171,3 +171,21 @@ class UserRepository:
             conn.execute(
                 "UPDATE employees SET user_id = NULL WHERE user_id = ?", (user_id,)
             )
+
+    def delete_user(self, user_id: int):
+        """Hard-delete a user, leaving no trace except the caller's audit-log entry.
+
+        Both statements run in one connection, so they share a single transaction
+        (sqlite3's context manager commits on success / rolls back on error).
+
+        The explicit employee unlink is what the caller asked for; the remaining
+        references are cleaned up by the schema's ON DELETE rules when the user row
+        is removed:
+          • employees.user_id            → SET NULL  (also covered explicitly below)
+          • password_reset_tokens.user_id, item_responsibles.user_id → CASCADE
+          • items.created_by, subtasks.responsible_user_id           → SET NULL
+          • audit_log.user_id            → SET NULL  (user_email/user_name preserved)
+        """
+        with get_connection() as conn:
+            conn.execute("UPDATE employees SET user_id = NULL WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))

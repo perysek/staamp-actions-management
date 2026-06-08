@@ -31,7 +31,7 @@
                         <th class="no-sort">Nr prac.</th>
                         <th class="no-sort">Status</th>
                         <th class="no-sort">Ostatnie logowanie</th>
-                        <th class="no-sort" style="width:100px;"></th>
+                        <th class="no-sort" style="width:140px;"></th>
                     </tr>
                 </thead>
                 <tbody id="users-body"></tbody>
@@ -69,6 +69,7 @@
 <script>
 let allUsers = [];
 let resetUserId = null;
+const CURRENT_USER_ID = {{ current_user.id }};  // injected by Flask-Login
 
 async function loadUsers() {
     const resp = await fetch('{{ url_for("users.api_list") }}');
@@ -99,6 +100,13 @@ function renderUsers(users) {
         const toggleTitle = u.is_active ? 'Dezaktywuj' : 'Aktywuj';
         const toggleColor = u.is_active ? '#dc2626' : '#16a34a';
         const toggleBorder = u.is_active ? '#fca5a5' : '#86efac';
+        // Hide delete for your own account and for superusers — mirrors the server-side guards.
+        const deleteBtn = (u.id !== CURRENT_USER_ID && u.role !== 'superuser')
+            ? `<button onclick="confirmDelete(${u.id})" title="Usuń"
+                    style="width:30px;height:30px;border:1px solid #fca5a5;border-radius:2px;background:#fff;color:#dc2626;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">
+                    <span class="material-icons" style="font-size:16px;">delete</span>
+                </button>`
+            : '';
 
         return `<tr class="table-row-hover">
             <td><strong>${escHtml(u.full_name)}</strong></td>
@@ -119,6 +127,7 @@ function renderUsers(users) {
                         style="width:30px;height:30px;border:1px solid #bfdbfe;border-radius:2px;background:#fff;color:#1d4ed8;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">
                     <span class="material-icons" style="font-size:16px;">lock_reset</span>
                 </button>
+                ${deleteBtn}
             </td>
         </tr>`;
     }).join('');
@@ -134,6 +143,22 @@ async function toggleActive(userId) {
     const data = await resp.json();
     if (data.success) loadUsers();
     else Notifications.error(data.error || 'Błąd');
+}
+
+function confirmDelete(userId) {
+    const user = allUsers.find(u => u.id === userId);
+    const name = user ? user.full_name : '';
+    Modals.confirm({
+        title: 'Usuń użytkownika',
+        message: `Trwale usunąć użytkownika „${name}”? Powiązany pracownik zostanie odłączony, a konto bezpowrotnie skasowane. Pozostanie wyłącznie wpis w dzienniku audytu.`,
+        confirmText: 'Usuń', cancelText: 'Anuluj', type: 'danger',
+        onConfirm: async () => {
+            const resp = await fetch(`/system/users/api/${userId}`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) { Notifications.success('Użytkownik usunięty'); loadUsers(); }
+            else Notifications.error(data.error || 'Błąd usuwania użytkownika');
+        },
+    });
 }
 
 function openResetPwModal(userId, userName) {

@@ -174,3 +174,32 @@ def api_reset_password(user_id: int):
               user_name=current_user.full_name, entity_type='user', entity_id=user_id,
               ip_address=request.remote_addr)
     return jsonify({'success': True})
+
+
+@users_bp.route('/api/<int:user_id>', methods=['DELETE'])
+@login_required
+@role_required('superuser')
+def api_delete(user_id: int):
+    existing = _user_repo.get_by_id(user_id)
+    if not existing:
+        return jsonify({'success': False, 'error': 'Użytkownik nie istnieje'}), 404
+
+    if user_id == current_user.id:
+        return jsonify({'success': False, 'error': 'Nie możesz usunąć swojego konta'}), 400
+
+    if existing['role'] == 'superuser':
+        return jsonify({'success': False, 'error': 'Nie możesz usunąć konta administratora'}), 403
+
+    # Capture identity BEFORE deletion — the audit entry is the only trace left behind.
+    employee = _user_repo.get_employee_for_user(user_id)
+    mosys_id = employee['mosys_employee_id'] if employee else None
+    detail = existing['full_name']
+    if mosys_id:
+        detail += f' (nr {mosys_id})'
+
+    _user_repo.delete_user(user_id)
+
+    log_event('user_delete', user_id=current_user.id, user_email=current_user.email,
+              user_name=current_user.full_name, entity_type='user', entity_id=user_id,
+              detail=detail, ip_address=request.remote_addr)
+    return jsonify({'success': True})
