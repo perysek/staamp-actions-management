@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
 
     <!-- TailwindCSS (compiled output) -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}?v={{ app_version }}" />
 
     {% block extra_head %}{% endblock %}
 
@@ -214,8 +214,8 @@
             <div class="flex items-center gap-2">
                 <span class="material-icons" style="color:var(--color-accent);font-size:26px;">checklist</span>
                 <div>
-                    <div class="sidebar-logo-title">Zarządzanie działaniami</div>
-                    <div class="sidebar-logo-sub">STAAMP</div>
+                    <div class="sidebar-logo-title">Plany działań</div>
+                    <div class="sidebar-logo-sub">Staamp Poland</div>
                 </div>
             </div>
         </div>
@@ -348,14 +348,14 @@
 <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
 <!-- Core JS -->
-<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
-<script src="{{ url_for('static', filename='js/api.js') }}"></script>
-<script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
-<script src="{{ url_for('static', filename='js/modals.js') }}"></script>
-<script src="{{ url_for('static', filename='js/table-utils.js') }}"></script>
-<script src="{{ url_for('static', filename='js/searchable-select.js') }}"></script>
-<script src="{{ url_for('static', filename='js/keyboard-shortcuts.js') }}"></script>
-<script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+<script src="{{ url_for('static', filename='js/utils.js') }}?v={{ app_version }}"></script>
+<script src="{{ url_for('static', filename='js/api.js') }}?v={{ app_version }}"></script>
+<script src="{{ url_for('static', filename='js/notifications.js') }}?v={{ app_version }}"></script>
+<script src="{{ url_for('static', filename='js/modals.js') }}?v={{ app_version }}"></script>
+<script src="{{ url_for('static', filename='js/table-utils.js') }}?v={{ app_version }}"></script>
+<script src="{{ url_for('static', filename='js/searchable-select.js') }}?v={{ app_version }}"></script>
+<script src="{{ url_for('static', filename='js/keyboard-shortcuts.js') }}?v={{ app_version }}"></script>
+<script src="{{ url_for('static', filename='js/i18n.js') }}?v={{ app_version }}"></script>
 
 <script>
 function toggleSidebar() {
