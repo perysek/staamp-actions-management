@@ -33,6 +33,7 @@
         'Zarządzanie działaniami': 'Action Management',
         'Pulpit': 'Dashboard',
         'Działania': 'Actions',
+        'Zadania': 'Action Items',
         'Oś czasu': 'Timeline',
         'Użytkownicy': 'Users',
         'Pracownicy': 'Employees',
