@@ -193,6 +193,9 @@
             .sidebar { position:fixed; left:0; top:0; height:100vh; transform:translateX(-100%); }
             .sidebar.open { transform:translateX(0); }
         }
+        /* On desktop the sidebar is always visible, so the top header bar only
+           held a redundant page title — hide it; the page's own .page-title remains. */
+        @media (min-width:1024px) { .app-header { display:none; } }
 
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
@@ -292,19 +295,14 @@
 
     <!-- ═══ MAIN COLUMN ══════════════════════════════════════════ -->
     <div class="main-col">
-        <!-- Header -->
+        <!-- Header — mobile only (carries the sidebar toggle). Hidden on desktop
+             via CSS so it doesn't duplicate each page's own .page-title. -->
         <header class="app-header">
-            <!-- Mobile menu toggle -->
-            <button class="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg hover:bg-slate-100 transition-colors"
+            <button class="flex items-center justify-center w-9 h-9 rounded-lg hover:bg-slate-100 transition-colors"
                     onclick="toggleSidebar()" aria-label="Otwórz menu">
                 <span class="material-icons text-slate-600" style="font-size:20px;">menu</span>
             </button>
-
-            <div class="flex-1 min-w-0">
-                <h2 class="text-sm font-medium text-slate-700 truncate">{% block page_heading %}{% endblock %}</h2>
-            </div>
-
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 ml-auto">
                 {% block page_actions %}{% endblock %}
             </div>
         </header>
