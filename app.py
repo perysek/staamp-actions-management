@@ -76,7 +76,7 @@ def create_app() -> Flask:
 
         return {
             'now': datetime.now,
-            'app_version': '1.0.1',
+            'app_version': '1.0.2',
             'app_name': 'Staamp Global Actions Management',
             'user_permissions': user_permissions,
             'current_mosys_employee_id': current_mosys_employee_id,

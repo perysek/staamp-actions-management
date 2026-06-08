@@ -14,6 +14,68 @@
     .item-title-clamp { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
                         overflow:hidden; line-height:1.3; overflow-wrap:break-word;
                         color:var(--color-ink); font-weight:700; text-decoration:none; }
+
+    /* ── Sortable / filterable column headers ─────────────────────────────────
+       Each header cell stacks: a clickable sort label (top) + a filter control
+       (bottom). Headers stay top-aligned so labels line up across columns. */
+    /* Fixed layout so the declared column widths are honoured — otherwise the
+       nowrap filter controls (e.g. the plan dropdown) dictate column widths and
+       overflow the container. Scoped to this table only. */
+    #items-table { table-layout:fixed; width:100%; }
+    .refined-table thead th { vertical-align:top; }
+    /* Tighter header type so labels fit their fixed columns without being clipped
+       by the neighbouring sticky <th> (e.g. "Odpowiedzialni", "Podzadania"). */
+    #items-table thead th { font-size:.62rem; letter-spacing:.04em; padding-left:.7rem; padding-right:.7rem; }
+    #items-table tbody td { padding-left:.7rem; padding-right:.7rem; }
+    /* Long plan names / responsibles wrap within their fixed columns. */
+    #items-table tbody td { overflow-wrap:break-word; }
+    .th-cell  { display:flex; flex-direction:column; gap:.4rem; }
+    .th-sort  { display:inline-flex; align-items:center; gap:.25rem; cursor:pointer; user-select:none; }
+    .th-sort .sort-ico { font-size:14px; opacity:.45; transition:opacity .15s ease; }
+    .th-sort:hover .sort-ico { opacity:.85; }
+    .th-sort.active .sort-ico { opacity:.95; color:var(--color-accent); }
+
+    /* Filter controls live inside the uppercase/letter-spaced thead, so reset
+       those inherited text styles to keep filter text readable. */
+    .hf-text, .hf-select, .hf-multi-btn {
+        width:100%; padding:.3rem .4rem; font-size:.7rem; font-weight:400;
+        font-family:inherit; color:var(--color-ink); background:#fff;
+        border:1px solid var(--color-border); border-radius:2px; outline:none;
+        text-transform:none; letter-spacing:normal;
+    }
+    .hf-text:focus, .hf-select:focus, .hf-multi-btn:focus {
+        border-color:var(--color-accent); box-shadow:0 0 0 2px var(--color-accent-muted);
+    }
+    .hf-select { cursor:pointer; }
+
+    /* Multi-choice plan filter (custom checkbox dropdown). */
+    .hf-multi { position:relative; }
+    .hf-multi-btn { display:flex; align-items:center; justify-content:space-between; gap:.3rem; cursor:pointer; text-align:left; }
+    .hf-multi-btn.placeholder { color:var(--color-ink-subtle); }
+    .hf-multi-btn .material-icons { font-size:16px; flex-shrink:0; opacity:.6; }
+    .hf-multi-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .hf-multi-panel { position:absolute; top:calc(100% + 2px); left:0; min-width:100%; max-width:280px;
+                      max-height:240px; overflow:auto; background:#fff; border:1px solid var(--color-border);
+                      border-radius:2px; box-shadow:0 6px 22px rgba(0,0,0,.18); z-index:30; padding:.25rem; display:none; }
+    .hf-multi-panel.open { display:block; }
+    .hf-opt { display:flex; align-items:center; gap:.45rem; padding:.32rem .45rem; font-size:.74rem;
+              font-weight:400; text-transform:none; letter-spacing:normal; color:var(--color-ink);
+              cursor:pointer; border-radius:2px; white-space:nowrap; }
+    .hf-opt:hover { background:var(--color-surface-warm); }
+    .hf-opt input { accent-color:var(--color-accent); cursor:pointer; }
+
+    /* Status badge: never wrap (e.g. "W toku" must stay on one line). */
+    .refined-table .status-badge { white-space:nowrap; }
+
+    /* Subtask count chip: lighter shade of the "+ Nowe działanie" accent button,
+       square corners, darkens on hover, opens the timeline on click. */
+    .subtask-chip { display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px;
+                    padding:0 .55rem; border:1px solid var(--color-accent); border-radius:0;
+                    background:var(--color-accent-muted); color:var(--color-accent); font-weight:600;
+                    font-size:.78rem; line-height:1; text-decoration:none; cursor:pointer;
+                    transition:background .2s ease, color .2s ease; }
+    .subtask-chip:hover { background:var(--color-accent); color:#fff; }
+    .subtask-zero { color:var(--color-ink-subtle); }
 </style>
 <div class="refined-page">
     <div class="page-header">
@@ -37,13 +99,51 @@
             <table class="refined-table" id="items-table" style="display:none;">
                 <thead>
                     <tr>
-                        <th class="no-sort">Plan działań</th>
-                        <th class="no-sort" style="width:34%;min-width:150px;">Tytuł</th>
-                        <th class="no-sort">Status</th>
-                        <th class="no-sort" style="min-width:120px;">Termin</th>
-                        <th class="no-sort">Odpowiedzialni</th>
-                        <th class="no-sort">Podzadania</th>
-                        <th class="no-sort" style="width:100px;"></th>
+                        <th class="no-sort" style="width:202px;">
+                            <div class="th-cell">
+                                <span class="th-sort" data-key="plan"><span>Plan działań</span><span class="material-icons sort-ico">unfold_more</span></span>
+                                <div class="hf-multi" id="plan-filter">
+                                    <button type="button" class="hf-multi-btn placeholder" id="plan-filter-btn">
+                                        <span class="hf-multi-label">Wybierz plan działań...</span>
+                                        <span class="material-icons">arrow_drop_down</span>
+                                    </button>
+                                    <div class="hf-multi-panel" id="plan-filter-panel"></div>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="no-sort">
+                            <div class="th-cell">
+                                <span class="th-sort" data-key="title"><span>Tytuł</span><span class="material-icons sort-ico">unfold_more</span></span>
+                                <input type="text" class="hf-text" id="title-filter" placeholder="Filtruj tytuł…">
+                            </div>
+                        </th>
+                        <th class="no-sort" style="width:130px;">
+                            <div class="th-cell">
+                                <span class="th-sort" data-key="status"><span>Status</span><span class="material-icons sort-ico">unfold_more</span></span>
+                                <select class="hf-select" id="status-filter">
+                                    <option value="">Wszystkie</option>
+                                </select>
+                            </div>
+                        </th>
+                        <th class="no-sort" style="width:96px;">
+                            <div class="th-cell">
+                                <span class="th-sort" data-key="due"><span>Termin</span><span class="material-icons sort-ico">unfold_more</span></span>
+                            </div>
+                        </th>
+                        <th class="no-sort" style="width:150px;">
+                            <div class="th-cell">
+                                <span class="th-sort" data-key="responsible"><span>Odpowiedzialni</span><span class="material-icons sort-ico">unfold_more</span></span>
+                                <select class="hf-select" id="responsible-filter">
+                                    <option value="">Wszyscy</option>
+                                </select>
+                            </div>
+                        </th>
+                        <th class="no-sort" style="width:120px;">
+                            <div class="th-cell">
+                                <span class="th-sort" data-key="subtasks"><span>Podzadania</span><span class="material-icons sort-ico">unfold_more</span></span>
+                            </div>
+                        </th>
+                        <th class="no-sort" style="width:120px;"></th>
                     </tr>
                 </thead>
                 <tbody id="items-body"></tbody>
@@ -57,6 +157,8 @@
 <script>
 const canManage = {{ 'true' if current_user.role in ['superuser', 'manager'] else 'false' }};
 
+// Fixed status vocabulary (mirrors ITEM_STATUS_OPTIONS in routes/items/routes.py).
+const STATUS_ORDER  = ['open', 'in_progress', 'on_hold', 'done', 'cancelled'];
 const STATUS_LABELS = { open:'Otwarte', in_progress:'W toku', on_hold:'Wstrzymane', done:'Zakończone', cancelled:'Anulowane' };
 const STATUS_BADGE = {
     open:        'background:#eff6ff;color:#1e40af;',
@@ -67,31 +169,137 @@ const STATUS_BADGE = {
 };
 
 let allItems = [];
+// Active filter + sort state. plans is a Set of plan_id strings (multi-choice).
+const state = { search:'', title:'', plans:new Set(), status:'', responsible:'', sortKey:null, sortDir:1 };
 
 function escHtml(str) {
     if (str === null || str === undefined) return '';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Split a GROUP_CONCAT "A, B" responsibles string into individual trimmed names.
+function splitResponsibles(s) {
+    return (s || '').split(',').map(x => x.trim()).filter(Boolean);
+}
+
 async function loadItems() {
     const resp = await fetch('{{ url_for("items.api_list") }}');
     const data = await resp.json();
     allItems = data.items || [];
-    renderItems(allItems);
+    buildFilterOptions();
+    applyUrlPlanFilter();   // TASK#1: deep-link from the action-plans "view" button
+    apply();
 }
+
+// Populate the plan multi-choice panel + status/responsible single-choice selects
+// from the data actually present in the table.
+function buildFilterOptions() {
+    // Plans — unique (id, name) pairs, ordered by name.
+    const planMap = new Map();
+    allItems.forEach(it => {
+        if (it.plan_id != null && !planMap.has(String(it.plan_id)))
+            planMap.set(String(it.plan_id), it.plan_name || '—');
+    });
+    const plans = Array.from(planMap.entries()).sort((a, b) => a[1].localeCompare(b[1], 'pl'));
+    document.getElementById('plan-filter-panel').innerHTML = plans.map(([id, name]) =>
+        `<label class="hf-opt"><input type="checkbox" class="plan-opt" value="${escHtml(id)}">${escHtml(name)}</label>`
+    ).join('') || '<div style="padding:.4rem .5rem;font-size:.72rem;color:var(--color-ink-subtle);">Brak planów</div>';
+
+    // Status — fixed vocabulary in canonical order.
+    const statusSel = document.getElementById('status-filter');
+    statusSel.innerHTML = '<option value="">Wszystkie</option>' +
+        STATUS_ORDER.map(s => `<option value="${s}">${escHtml(STATUS_LABELS[s])}</option>`).join('');
+
+    // Responsible — distinct names found across all items.
+    const names = new Set();
+    allItems.forEach(it => splitResponsibles(it.responsibles).forEach(n => names.add(n)));
+    const sorted = Array.from(names).sort((a, b) => a.localeCompare(b, 'pl'));
+    const respSel = document.getElementById('responsible-filter');
+    respSel.innerHTML = '<option value="">Wszyscy</option>' +
+        sorted.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+}
+
+// TASK#1: if arrived via /items/?plan_id=<id>, pre-select that plan in the filter.
+function applyUrlPlanFilter() {
+    const planId = new URLSearchParams(location.search).get('plan_id');
+    if (!planId) return;
+    const box = document.querySelector(`.plan-opt[value="${CSS.escape(planId)}"]`);
+    if (box) { box.checked = true; state.plans.add(String(planId)); updatePlanLabel(); }
+}
+
+function updatePlanLabel() {
+    const btn = document.getElementById('plan-filter-btn');
+    const label = btn.querySelector('.hf-multi-label');
+    if (state.plans.size === 0) {
+        label.textContent = 'Wybierz plan działań...';
+        btn.classList.add('placeholder');
+        return;
+    }
+    btn.classList.remove('placeholder');
+    const names = Array.from(document.querySelectorAll('.plan-opt'))
+        .filter(b => b.checked)
+        .map(b => b.parentElement.textContent.trim());
+    label.textContent = names.length === 1 ? names[0] : `${names.length} planów`;
+}
+
+// ── Filtering + sorting ───────────────────────────────────────────────────────
+function getVisible() {
+    const q = state.search;
+    let rows = allItems.filter(it => {
+        if (q) {
+            const hay = `${it.title || ''} ${it.plan_name || ''} ${STATUS_LABELS[it.status] || ''} ${it.responsibles || ''}`.toLowerCase();
+            if (!hay.includes(q)) return false;
+        }
+        if (state.title && !(it.title || '').toLowerCase().includes(state.title)) return false;
+        if (state.plans.size && !state.plans.has(String(it.plan_id))) return false;
+        if (state.status && it.status !== state.status) return false;
+        if (state.responsible && !splitResponsibles(it.responsibles).includes(state.responsible)) return false;
+        return true;
+    });
+
+    if (state.sortKey) {
+        const dir = state.sortDir;
+        rows = rows.slice().sort((a, b) => {
+            let av, bv;
+            switch (state.sortKey) {
+                case 'plan':        av = a.plan_name || '';  bv = b.plan_name || '';  return dir * av.localeCompare(bv, 'pl');
+                case 'title':       av = a.title || '';      bv = b.title || '';      return dir * av.localeCompare(bv, 'pl');
+                case 'status':      return dir * (STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+                case 'responsible': av = a.responsibles || ''; bv = b.responsibles || ''; return dir * av.localeCompare(bv, 'pl');
+                case 'subtasks':    return dir * ((a.subtask_count || 0) - (b.subtask_count || 0));
+                case 'due':
+                    // Empty due dates always sort last, regardless of direction.
+                    av = a.due_date || ''; bv = b.due_date || '';
+                    if (!av && !bv) return 0;
+                    if (!av) return 1;
+                    if (!bv) return -1;
+                    return dir * av.localeCompare(bv);
+            }
+            return 0;
+        });
+    }
+    return rows;
+}
+
+function apply() { renderItems(getVisible()); }
 
 function renderItems(items) {
     document.getElementById('loading-state').style.display = 'none';
+    const table = document.getElementById('items-table');
+    const empty = document.getElementById('empty-state');
+    // Keep the header (and its filters) visible even when the filter result is empty.
+    table.style.display = 'table';
+    if (!allItems.length) { table.style.display = 'none'; empty.style.display = 'block'; empty.textContent = 'Brak działań'; return; }
+    empty.style.display = 'none';
+
     if (!items.length) {
-        document.getElementById('empty-state').style.display = 'block';
-        document.getElementById('items-table').style.display = 'none';
+        document.getElementById('items-body').innerHTML =
+            `<tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Brak działań pasujących do filtrów</td></tr>`;
         return;
     }
-    document.getElementById('empty-state').style.display = 'none';
-    document.getElementById('items-table').style.display = 'table';
 
     document.getElementById('items-body').innerHTML = items.map(it => {
-        const statusBadge = `<span class="badge" style="${STATUS_BADGE[it.status] || ''}">${escHtml(STATUS_LABELS[it.status] || it.status)}</span>`;
+        const statusBadge = `<span class="badge status-badge" style="${STATUS_BADGE[it.status] || ''}">${escHtml(STATUS_LABELS[it.status] || it.status)}</span>`;
         const planLabel = escHtml(it.plan_name || '—');
         let dueWarn = '';
         if (it.due_warning === 'overdue')
@@ -102,6 +310,10 @@ function renderItems(items) {
             ? `<span class="due-val">${escHtml(it.due_date.replace(/-/g, '.'))}</span>${dueWarn}`
             : '<span style="color:var(--color-ink-subtle);">—</span>';
         const resp = it.responsibles ? escHtml(it.responsibles) : '<span style="color:var(--color-ink-subtle);">—</span>';
+        // #5: subtasks > 0 → clickable chip opening the timeline; otherwise a muted zero.
+        const subtasks = it.subtask_count > 0
+            ? `<a href="/timeline/${it.id}?from=items" class="subtask-chip" title="Otwórz oś czasu">${it.subtask_count}</a>`
+            : `<span class="subtask-zero">0</span>`;
         let actions = `<a href="/items/${it.id}" title="Szczegóły" style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:16px;">visibility</span></a>`;
         if (canManage) {
             actions += ` <a href="/items/${it.id}/edit" title="Edytuj" style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:16px;">edit</span></a>`;
@@ -113,8 +325,8 @@ function renderItems(items) {
             <td>${statusBadge}</td>
             <td class="due-cell">${due}</td>
             <td style="color:var(--color-ink-muted);">${resp}</td>
-            <td style="text-align:center;">${it.subtask_count}</td>
-            <td style="text-align:right;white-space:nowrap;padding:.5rem 1rem;">${actions}</td>
+            <td style="text-align:center;">${subtasks}</td>
+            <td style="text-align:right;white-space:nowrap;padding:.5rem .5rem;">${actions}</td>
         </tr>`;
     }).join('');
 }
@@ -133,14 +345,59 @@ function deleteItem(id, title) {
     });
 }
 
+// ── Sort header wiring (#1): icon toggles unfold_more → arrow_upward → arrow_downward ──
+function updateSortIcons() {
+    document.querySelectorAll('.th-sort').forEach(el => {
+        const ico = el.querySelector('.sort-ico');
+        if (el.dataset.key === state.sortKey) {
+            el.classList.add('active');
+            ico.textContent = state.sortDir === 1 ? 'arrow_upward' : 'arrow_downward';
+        } else {
+            el.classList.remove('active');
+            ico.textContent = 'unfold_more';
+        }
+    });
+}
+
+document.querySelectorAll('.th-sort').forEach(el => {
+    el.addEventListener('click', () => {
+        const key = el.dataset.key;
+        if (state.sortKey === key) state.sortDir = -state.sortDir;
+        else { state.sortKey = key; state.sortDir = 1; }
+        updateSortIcons();
+        apply();
+    });
+});
+
+// ── Filter wiring (#2 plan / #3 status+responsible / #4 title) ────────────────
+document.getElementById('title-filter').addEventListener('input', function () {
+    state.title = this.value.trim().toLowerCase(); apply();
+});
+document.getElementById('status-filter').addEventListener('change', function () {
+    state.status = this.value; apply();
+});
+document.getElementById('responsible-filter').addEventListener('change', function () {
+    state.responsible = this.value; apply();
+});
+
+// Plan multi-choice dropdown: toggle panel, sync checkboxes, close on outside click.
+const planFilter = document.getElementById('plan-filter');
+const planBtn = document.getElementById('plan-filter-btn');
+const planPanel = document.getElementById('plan-filter-panel');
+planBtn.addEventListener('click', e => { e.stopPropagation(); planPanel.classList.toggle('open'); });
+planPanel.addEventListener('click', e => e.stopPropagation());
+planPanel.addEventListener('change', e => {
+    if (!e.target.classList.contains('plan-opt')) return;
+    if (e.target.checked) state.plans.add(e.target.value);
+    else state.plans.delete(e.target.value);
+    updatePlanLabel();
+    apply();
+});
+document.addEventListener('click', () => planPanel.classList.remove('open'));
+
+// Global search box (complements the column filters).
 document.getElementById('search-input').addEventListener('input', function () {
-    const q = this.value.toLowerCase();
-    renderItems(allItems.filter(it =>
-        (it.title || '').toLowerCase().includes(q) ||
-        (it.plan_name || '').toLowerCase().includes(q) ||
-        (STATUS_LABELS[it.status] || '').toLowerCase().includes(q) ||
-        (it.responsibles || '').toLowerCase().includes(q)
-    ));
+    state.search = this.value.trim().toLowerCase(); apply();
 });
 
 loadItems();

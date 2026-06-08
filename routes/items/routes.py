@@ -174,8 +174,8 @@ def api_list():
     assigned_only = _role_repo.role_has_flag(current_user.role, 'actions_view_assigned_only')
     rows = _item_repo.get_for_user(current_user.id, assigned_only)
     items = [{
-        'id': r['id'], 'plan_name': r['plan_name'], 'title': r['title'],
-        'status': r['status'], 'due_date': r['due_date'],
+        'id': r['id'], 'plan_id': r['action_plan_id'], 'plan_name': r['plan_name'],
+        'title': r['title'], 'status': r['status'], 'due_date': r['due_date'],
         'subtask_count': r['subtask_count'], 'responsibles': r['responsibles'],
         'due_warning': _due_warning(r['due_date'], r['earliest_start'],
                                     r['created_at'], r['status']),

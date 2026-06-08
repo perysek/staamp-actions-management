@@ -39,9 +39,15 @@
                 <button data-unit="weeks">Tygodnie</button>
                 <button data-unit="months">Miesiące</button>
             </div>
-            <a href="{{ url_for('items.item_detail', item_id=item['id']) }}" class="ff-btn ff-btn-secondary btn-press">
+            {% if request.args.get('from') == 'items' %}
+            <a href="{{ url_for('items.items_list') }}" id="g-back" class="ff-btn ff-btn-secondary btn-press">
+                <span class="material-icons" style="font-size:17px;">arrow_back</span> Tabela zadań
+            </a>
+            {% else %}
+            <a href="{{ url_for('items.item_detail', item_id=item['id']) }}" id="g-back" class="ff-btn ff-btn-secondary btn-press">
                 <span class="material-icons" style="font-size:17px;">arrow_back</span> Szczegóły
             </a>
+            {% endif %}
         </div>
     </div>
 
@@ -345,6 +351,16 @@ document.querySelectorAll('#g-unit-toggle button').forEach(b =>
 // Responsive: re-render (and re-fill width) on window resize.
 let _rzTimer;
 window.addEventListener('resize', () => { clearTimeout(_rzTimer); _rzTimer = setTimeout(() => { if (baseMin) render(); }, 150); });
+
+// ESC → follow the back button (#5). Skipped while an inline editor is focused,
+// so ESC still cancels subtask title/responsible/date edits first.
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+    const back = document.getElementById('g-back');
+    if (back) window.location.href = back.href;
+});
 
 loadGantt();
 setInterval(positionNow, 60000);

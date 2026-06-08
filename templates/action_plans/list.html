@@ -77,6 +77,10 @@ function renderPlans(plans) {
             <td style="text-align:center;">${p.usage_count}</td>
             <td>${statusBadge}</td>
             <td style="text-align:right;display:flex;gap:.4rem;justify-content:flex-end;padding:.5rem 1rem;">
+                <a href="/items/?plan_id=${p.id}" title="Pokaż działania tego planu"
+                   style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">
+                    <span class="material-icons" style="font-size:16px;">visibility</span>
+                </a>
                 <a href="/system/action-plans/${p.id}/edit" title="Edytuj"
                    style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">
                     <span class="material-icons" style="font-size:16px;">edit</span>
