@@ -37,16 +37,15 @@
 
     /* Filter controls live inside the uppercase/letter-spaced thead, so reset
        those inherited text styles to keep filter text readable. */
-    .hf-text, .hf-select, .hf-multi-btn {
+    .hf-text, .hf-multi-btn {
         width:100%; padding:.3rem .4rem; font-size:.7rem; font-weight:400;
         font-family:inherit; color:var(--color-ink); background:#fff;
         border:1px solid var(--color-border); border-radius:2px; outline:none;
         text-transform:none; letter-spacing:normal;
     }
-    .hf-text:focus, .hf-select:focus, .hf-multi-btn:focus {
+    .hf-text:focus, .hf-multi-btn:focus {
         border-color:var(--color-accent); box-shadow:0 0 0 2px var(--color-accent-muted);
     }
-    .hf-select { cursor:pointer; }
 
     /* Multi-choice plan filter (custom checkbox dropdown). */
     .hf-multi { position:relative; }
@@ -120,9 +119,13 @@
                         <th class="no-sort" style="width:130px;">
                             <div class="th-cell">
                                 <span class="th-sort" data-key="status"><span>Status</span><span class="material-icons sort-ico">unfold_more</span></span>
-                                <select class="hf-select" id="status-filter">
-                                    <option value="">Wszystkie</option>
-                                </select>
+                                <div class="hf-multi" id="status-filter">
+                                    <button type="button" class="hf-multi-btn placeholder" id="status-filter-btn">
+                                        <span class="hf-multi-label">Wszystkie</span>
+                                        <span class="material-icons">arrow_drop_down</span>
+                                    </button>
+                                    <div class="hf-multi-panel" id="status-filter-panel"></div>
+                                </div>
                             </div>
                         </th>
                         <th class="no-sort" style="width:96px;">
@@ -133,9 +136,13 @@
                         <th class="no-sort" style="width:150px;">
                             <div class="th-cell">
                                 <span class="th-sort" data-key="responsible"><span>Odpowiedzialni</span><span class="material-icons sort-ico">unfold_more</span></span>
-                                <select class="hf-select" id="responsible-filter">
-                                    <option value="">Wszyscy</option>
-                                </select>
+                                <div class="hf-multi" id="responsible-filter">
+                                    <button type="button" class="hf-multi-btn placeholder" id="responsible-filter-btn">
+                                        <span class="hf-multi-label">Wszyscy</span>
+                                        <span class="material-icons">arrow_drop_down</span>
+                                    </button>
+                                    <div class="hf-multi-panel" id="responsible-filter-panel"></div>
+                                </div>
                             </div>
                         </th>
                         <th class="no-sort" style="width:120px;">
@@ -169,8 +176,8 @@ const STATUS_BADGE = {
 };
 
 let allItems = [];
-// Active filter + sort state. plans is a Set of plan_id strings (multi-choice).
-const state = { search:'', title:'', plans:new Set(), status:'', responsible:'', sortKey:null, sortDir:1 };
+// Active filter + sort state. plans/status/responsible are Sets (multi-choice).
+const state = { search:'', title:'', plans:new Set(), status:new Set(), responsible:new Set(), sortKey:null, sortDir:1 };
 
 function escHtml(str) {
     if (str === null || str === undefined) return '';
@@ -191,8 +198,8 @@ async function loadItems() {
     apply();
 }
 
-// Populate the plan multi-choice panel + status/responsible single-choice selects
-// from the data actually present in the table.
+// Populate the plan / status / responsible multi-choice panels from the data
+// actually present in the table.
 function buildFilterOptions() {
     // Plans — unique (id, name) pairs, ordered by name.
     const planMap = new Map();
@@ -205,18 +212,18 @@ function buildFilterOptions() {
         `<label class="hf-opt"><input type="checkbox" class="plan-opt" value="${escHtml(id)}">${escHtml(name)}</label>`
     ).join('') || '<div style="padding:.4rem .5rem;font-size:.72rem;color:var(--color-ink-subtle);">Brak planów</div>';
 
-    // Status — fixed vocabulary in canonical order.
-    const statusSel = document.getElementById('status-filter');
-    statusSel.innerHTML = '<option value="">Wszystkie</option>' +
-        STATUS_ORDER.map(s => `<option value="${s}">${escHtml(STATUS_LABELS[s])}</option>`).join('');
+    // Status — fixed vocabulary in canonical order (multi-choice checkboxes).
+    document.getElementById('status-filter-panel').innerHTML = STATUS_ORDER.map(s =>
+        `<label class="hf-opt"><input type="checkbox" value="${s}">${escHtml(STATUS_LABELS[s])}</label>`
+    ).join('');
 
-    // Responsible — distinct names found across all items.
+    // Responsible — distinct names found across all items (multi-choice checkboxes).
     const names = new Set();
     allItems.forEach(it => splitResponsibles(it.responsibles).forEach(n => names.add(n)));
     const sorted = Array.from(names).sort((a, b) => a.localeCompare(b, 'pl'));
-    const respSel = document.getElementById('responsible-filter');
-    respSel.innerHTML = '<option value="">Wszyscy</option>' +
-        sorted.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+    document.getElementById('responsible-filter-panel').innerHTML = sorted.map(n =>
+        `<label class="hf-opt"><input type="checkbox" value="${escHtml(n)}">${escHtml(n)}</label>`
+    ).join('') || '<div style="padding:.4rem .5rem;font-size:.72rem;color:var(--color-ink-subtle);">Brak osób</div>';
 }
 
 // TASK#1: if arrived via /items/?plan_id=<id>, pre-select that plan in the filter.
@@ -224,22 +231,43 @@ function applyUrlPlanFilter() {
     const planId = new URLSearchParams(location.search).get('plan_id');
     if (!planId) return;
     const box = document.querySelector(`.plan-opt[value="${CSS.escape(planId)}"]`);
-    if (box) { box.checked = true; state.plans.add(String(planId)); updatePlanLabel(); }
+    if (box) { box.checked = true; state.plans.add(String(planId)); planMulti.updateLabel(); }
 }
 
-function updatePlanLabel() {
-    const btn = document.getElementById('plan-filter-btn');
+// ── Generic multi-choice dropdown filter ──────────────────────────────────────
+// Wires a .hf-multi (button + checkbox panel) to a Set in `state`. Panel option
+// HTML is built in buildFilterOptions(); this handles open/close, checkbox→Set
+// sync, the summary label, and re-applying filters. Returns { updateLabel } so
+// callers (e.g. the deep-link) can refresh the label after mutating state.
+function initMultiFilter(wrapId, stateSet, placeholder, plural) {
+    const btn = document.getElementById(wrapId + '-btn');
+    const panel = document.getElementById(wrapId + '-panel');
     const label = btn.querySelector('.hf-multi-label');
-    if (state.plans.size === 0) {
-        label.textContent = 'Wybierz plan działań...';
-        btn.classList.add('placeholder');
-        return;
+
+    function updateLabel() {
+        const checked = Array.from(panel.querySelectorAll('.hf-opt input')).filter(b => b.checked);
+        if (checked.length === 0) {
+            label.textContent = placeholder;
+            btn.classList.add('placeholder');
+            return;
+        }
+        btn.classList.remove('placeholder');
+        label.textContent = checked.length === 1
+            ? checked[0].parentElement.textContent.trim()
+            : `${checked.length} ${plural}`;
     }
-    btn.classList.remove('placeholder');
-    const names = Array.from(document.querySelectorAll('.plan-opt'))
-        .filter(b => b.checked)
-        .map(b => b.parentElement.textContent.trim());
-    label.textContent = names.length === 1 ? names[0] : `${names.length} planów`;
+
+    btn.addEventListener('click', e => { e.stopPropagation(); panel.classList.toggle('open'); });
+    panel.addEventListener('click', e => e.stopPropagation());
+    panel.addEventListener('change', e => {
+        if (!e.target.matches('.hf-opt input')) return;
+        if (e.target.checked) stateSet.add(e.target.value);
+        else stateSet.delete(e.target.value);
+        updateLabel();
+        apply();
+    });
+
+    return { updateLabel };
 }
 
 // ── Filtering + sorting ───────────────────────────────────────────────────────
@@ -252,8 +280,9 @@ function getVisible() {
         }
         if (state.title && !(it.title || '').toLowerCase().includes(state.title)) return false;
         if (state.plans.size && !state.plans.has(String(it.plan_id))) return false;
-        if (state.status && it.status !== state.status) return false;
-        if (state.responsible && !splitResponsibles(it.responsibles).includes(state.responsible)) return false;
+        if (state.status.size && !state.status.has(it.status)) return false;
+        // Match if the item shares ANY of the selected responsibles.
+        if (state.responsible.size && !splitResponsibles(it.responsibles).some(n => state.responsible.has(n))) return false;
         return true;
     });
 
@@ -369,31 +398,20 @@ document.querySelectorAll('.th-sort').forEach(el => {
     });
 });
 
-// ── Filter wiring (#2 plan / #3 status+responsible / #4 title) ────────────────
+// ── Filter wiring (#2 plan/status/responsible multi-choice / #4 title) ────────
 document.getElementById('title-filter').addEventListener('input', function () {
     state.title = this.value.trim().toLowerCase(); apply();
 });
-document.getElementById('status-filter').addEventListener('change', function () {
-    state.status = this.value; apply();
-});
-document.getElementById('responsible-filter').addEventListener('change', function () {
-    state.responsible = this.value; apply();
-});
 
-// Plan multi-choice dropdown: toggle panel, sync checkboxes, close on outside click.
-const planFilter = document.getElementById('plan-filter');
-const planBtn = document.getElementById('plan-filter-btn');
-const planPanel = document.getElementById('plan-filter-panel');
-planBtn.addEventListener('click', e => { e.stopPropagation(); planPanel.classList.toggle('open'); });
-planPanel.addEventListener('click', e => e.stopPropagation());
-planPanel.addEventListener('change', e => {
-    if (!e.target.classList.contains('plan-opt')) return;
-    if (e.target.checked) state.plans.add(e.target.value);
-    else state.plans.delete(e.target.value);
-    updatePlanLabel();
-    apply();
-});
-document.addEventListener('click', () => planPanel.classList.remove('open'));
+// Three multi-choice dropdowns share initMultiFilter(). planMulti is module-scoped
+// so applyUrlPlanFilter() can refresh its label after the deep-link pre-selection.
+const planMulti = initMultiFilter('plan-filter', state.plans, 'Wybierz plan działań...', 'planów');
+initMultiFilter('status-filter', state.status, 'Wszystkie', 'statusów');
+initMultiFilter('responsible-filter', state.responsible, 'Wszyscy', 'osób');
+
+// Close every open multi-choice panel on an outside click.
+document.addEventListener('click', () =>
+    document.querySelectorAll('.hf-multi-panel.open').forEach(p => p.classList.remove('open')));
 
 // Global search box (complements the column filters).
 document.getElementById('search-input').addEventListener('input', function () {
