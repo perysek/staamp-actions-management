@@ -141,6 +141,7 @@
         'Brak działań': 'No actions',
         'Brak użytkowników': 'No users',
         'Brak podzadań': 'No subtasks',
+        'Brak opisu': 'No description',
         'Brak zdarzeń': 'No events',
         'Brak': 'None',
         'brak': 'none',
@@ -156,6 +157,7 @@
         'Działania pogrupowane według planów': 'Actions grouped by plans',
         'Szczegóły działania': 'Action details',
         'Pokaż oś czasu': 'Show timeline',
+        'Widok szczegółowy': 'Detailed view',
         'Odpowiedzialni (działanie)': 'Responsible (action)',
         'Nowe działanie': 'New action',
         'Edytuj działanie': 'Edit action',
@@ -189,6 +191,7 @@
         /* Timeline */
         'Wybierz działanie, aby zobaczyć wykres Gantta jego podzadań': 'Select an action to see the Gantt chart of its subtasks',
         'Wykres Gantta podzadań ·': 'Subtask Gantt chart ·',
+        'Wykres Gantta podzadań': 'Subtask Gantt chart',
         'Dni': 'Days',
         'Tygodnie': 'Weeks',
         'Miesiące': 'Months',
