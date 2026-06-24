@@ -37,7 +37,7 @@
     .g-labelwrap { position:sticky;left:0;z-index:5;background:#fff;display:flex;box-sizing:border-box;border-right:1px solid var(--color-border); }
     .g-lc { display:flex;align-items:center;padding:0 .6rem;box-sizing:border-box;overflow:hidden;font-size:.78rem; }
     .g-lc-resp { border-left:1px solid var(--color-border-subtle);color:var(--color-ink-muted); }
-    .g-title-clamp { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.2;white-space:normal;overflow-wrap:break-word;word-break:normal; }
+    .g-title-clamp { display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.2;white-space:normal;overflow-wrap:break-word;word-break:normal; }
     .g-bar { position:absolute;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.15); }
     .g-toggle { display:inline-flex;border:1px solid var(--color-border);border-radius:2px;overflow:hidden; }
     .g-toggle button { border:none;border-left:1px solid var(--color-border);background:#fff;padding:.4rem .75rem;font-size:.75rem;cursor:pointer;font-family:inherit;color:var(--color-ink-muted); }
@@ -147,6 +147,7 @@
 {% block extra_scripts %}
 <script>
 const ITEM_ID = {{ item['id'] }};
+const ITEM_DUE_DATE = {{ item['due_date']|tojson }};
 const CAN_MANAGE = {{ can_manage|tojson }};
 const CAN_UPDATE_OWN = {{ can_update_own|tojson }};
 const CURRENT_USER_ID = {{ current_user.id }};
@@ -444,8 +445,8 @@ async function applyColor(subtaskId, color, overlay) {
 
 // ── Detailed view: subtask description rows + embedded read-only Gantt preview ──
 const DV_KEY = 'staamp_item_detailed_view';
-const DV_ROW_H = 44, DV_BAR_H = 18, DV_AXIS_H = 36;
-const DV_LABEL_TITLE_W = 220, DV_LABEL_RESP_W = 150, DV_LABEL_W = DV_LABEL_TITLE_W + DV_LABEL_RESP_W;
+const DV_ROW_H = 60, DV_BAR_H = 18, DV_AXIS_H = 36;
+const DV_LABEL_TITLE_W = 440, DV_LABEL_RESP_W = 150, DV_LABEL_W = DV_LABEL_TITLE_W + DV_LABEL_RESP_W;
 const DV_PXDAY = { days: 24, weeks: 6, months: 2 };
 const DV_MONTHS_PL = ['sty','lut','mar','kwi','maj','cze','lip','sie','wrz','paź','lis','gru'];
 const DV_STATUS_COLORS = { not_started:'#94a3b8', in_progress:'#c9a227', blocked:'#dc2626', done:'#2d6a4f', cancelled:'#cbd5e1' };
@@ -524,7 +525,7 @@ function dvRenderGantt() {
     empty.style.display = 'none';
     wrap.style.display = 'block';
 
-    // Date range — fold in today so the now-line is always in range when relevant.
+    // Date range — fold in today and the item's due date so both lines are always in range.
     let minD = null, maxD = null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const consider = d => { if (!d) return; if (!minD || d < minD) minD = d; if (!maxD || d > maxD) maxD = d; };
@@ -533,6 +534,7 @@ function dvRenderGantt() {
         consider(dvParseLocal(s.finish_date) || dvParseLocal(s.start_date));
     });
     consider(today);
+    consider(dvParseLocal(ITEM_DUE_DATE));
     minD = new Date(minD); minD.setDate(minD.getDate() - 1);
     maxD = new Date(maxD); maxD.setDate(maxD.getDate() + 1);
 
@@ -595,13 +597,15 @@ function dvRenderGantt() {
         </div>`;
     });
 
-    let nowHtml = '';
-    const now = new Date();
-    if (now >= dvRangeStart && now <= dvRangeEnd) {
-        const nowX = DV_LABEL_W + dvDayDiff(dvRangeStart, now) * dvPxDay;
-        nowHtml = `<div style="position:absolute;top:0;left:${nowX}px;width:2px;height:${fullH}px;background:#dc2626;z-index:4;pointer-events:none;"></div>`;
-    }
-    gantt.innerHTML = html + rows + nowHtml;
+    const dvMarkerLine = (date, color) => {
+        if (!date || date < dvRangeStart || date > dvRangeEnd) return '';
+        const x = DV_LABEL_W + dvDayDiff(dvRangeStart, date) * dvPxDay;
+        return `<div style="position:absolute;top:0;left:${x}px;width:2px;height:${fullH}px;background:${color};z-index:4;pointer-events:none;"></div>`;
+    };
+    // "Teraz" (today) — light blue. Item due date — green.
+    const nowHtml = dvMarkerLine(new Date(), '#38bdf8');
+    const dueHtml = dvMarkerLine(dvParseLocal(ITEM_DUE_DATE), '#16a34a');
+    gantt.innerHTML = html + rows + nowHtml + dueHtml;
 }
 
 document.querySelectorAll('#dv-unit-toggle button').forEach(b =>
