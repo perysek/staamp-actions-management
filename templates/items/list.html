@@ -65,6 +65,9 @@
 
     /* Status badge: never wrap (e.g. "W toku" must stay on one line). */
     .refined-table .status-badge { white-space:nowrap; }
+    /* Status column: keep badge + no-subtasks warning icon on a single line. */
+    .refined-table td.status-cell { white-space:nowrap; }
+    .no-subtasks-warn { font-size:16px; vertical-align:middle; margin-left:.3rem; cursor:default; color:#ca8a04; }
 
     /* Subtask count chip: lighter shade of the "+ Nowe działanie" accent button,
        square corners, darkens on hover, opens the timeline on click. */
@@ -116,7 +119,7 @@
                                 <input type="text" class="hf-text" id="title-filter" placeholder="Filtruj tytuł…">
                             </div>
                         </th>
-                        <th class="no-sort" style="width:130px;">
+                        <th class="no-sort" style="width:143px;">
                             <div class="th-cell">
                                 <span class="th-sort" data-key="status"><span>Status</span><span class="material-icons sort-ico">unfold_more</span></span>
                                 <div class="hf-multi" id="status-filter">
@@ -329,6 +332,10 @@ function renderItems(items) {
 
     document.getElementById('items-body').innerHTML = items.map(it => {
         const statusBadge = `<span class="badge status-badge" style="${STATUS_BADGE[it.status] || ''}">${escHtml(STATUS_LABELS[it.status] || it.status)}</span>`;
+        // Flag active items (not done/cancelled) that have no subtasks defined yet.
+        const noSubtasksWarn = (it.status !== 'done' && it.status !== 'cancelled' && !(it.subtask_count > 0))
+            ? `<span class="material-icons no-subtasks-warn" title="Brak podzadań">warning</span>`
+            : '';
         const planLabel = escHtml(it.plan_name || '—');
         let dueWarn = '';
         if (it.due_warning === 'overdue')
@@ -351,7 +358,7 @@ function renderItems(items) {
         return `<tr class="table-row-hover">
             <td>${planLabel}</td>
             <td><a href="/items/${it.id}" class="item-title-clamp" title="${escHtml(it.title)}">${escHtml(it.title)}</a></td>
-            <td>${statusBadge}</td>
+            <td class="status-cell">${statusBadge}${noSubtasksWarn}</td>
             <td class="due-cell">${due}</td>
             <td style="color:var(--color-ink-muted);">${resp}</td>
             <td style="text-align:center;">${subtasks}</td>
