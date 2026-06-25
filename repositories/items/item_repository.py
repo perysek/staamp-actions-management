@@ -10,6 +10,10 @@ _LIST_SELECT = """
            (SELECT MIN(s.start_date) FROM subtasks s
              WHERE s.item_id = i.id AND s.start_date IS NOT NULL AND s.start_date != '')
              AS earliest_start,
+           (SELECT MAX(s.finish_date) FROM subtasks s
+             WHERE s.item_id = i.id AND s.status = 'done'
+               AND s.finish_date IS NOT NULL AND s.finish_date != '')
+             AS latest_done_finish,
            (SELECT GROUP_CONCAT(u.full_name, ', ')
               FROM item_responsibles ir JOIN users u ON u.id = ir.user_id
              WHERE ir.item_id = i.id) AS responsibles

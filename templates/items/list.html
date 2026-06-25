@@ -78,6 +78,16 @@
                     transition:background .2s ease, color .2s ease; }
     .subtask-chip:hover { background:var(--color-accent); color:#fff; }
     .subtask-zero { color:var(--color-ink-subtle); }
+
+    /* %-completed column: integer value + 2-tone progress bar.
+       Green theme = on-track; red theme = in-progress AND past its due date. */
+    .pct-cell  { display:flex; align-items:center; gap:.45rem; }
+    .pct-label { font-size:.78rem; font-weight:600; color:var(--color-ink); min-width:2.6em; text-align:right; flex-shrink:0; }
+    .pct-bar   { flex:1; height:7px; border-radius:4px; overflow:hidden; background:#dcfce7; }   /* dimmed-weak green track */
+    .pct-fill  { height:100%; background:#15803d; }                                              /* strong green fill */
+    .pct-bar.pct-overdue { background:#fca5a5; }            /* dimmed-weak red track */
+    .pct-bar.pct-overdue .pct-fill { background:#dc2626; }  /* strong red fill */
+    .pct-dash  { color:var(--color-ink-subtle); }
 </style>
 <div class="refined-page">
     <div class="page-header">
@@ -151,6 +161,11 @@
                         <th class="no-sort" style="width:120px;">
                             <div class="th-cell">
                                 <span class="th-sort" data-key="subtasks"><span>Podzadania</span><span class="material-icons sort-ico">unfold_more</span></span>
+                            </div>
+                        </th>
+                        <th class="no-sort" style="width:150px;">
+                            <div class="th-cell">
+                                <span class="th-sort" data-key="completed"><span>% ukończenia</span><span class="material-icons sort-ico">unfold_more</span></span>
                             </div>
                         </th>
                         <th class="no-sort" style="width:120px;"></th>
@@ -299,6 +314,13 @@ function getVisible() {
                 case 'status':      return dir * (STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
                 case 'responsible': av = a.responsibles || ''; bv = b.responsibles || ''; return dir * av.localeCompare(bv, 'pl');
                 case 'subtasks':    return dir * ((a.subtask_count || 0) - (b.subtask_count || 0));
+                case 'completed':
+                    // Missing values (no due date / no completed subtask yet) always sort last.
+                    av = a.percent_completed; bv = b.percent_completed;
+                    if (av == null && bv == null) return 0;
+                    if (av == null) return 1;
+                    if (bv == null) return -1;
+                    return dir * (av - bv);
                 case 'due':
                     // Empty due dates always sort last, regardless of direction.
                     av = a.due_date || ''; bv = b.due_date || '';
@@ -326,7 +348,7 @@ function renderItems(items) {
 
     if (!items.length) {
         document.getElementById('items-body').innerHTML =
-            `<tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Brak działań pasujących do filtrów</td></tr>`;
+            `<tr><td colspan="8" style="padding:2rem;text-align:center;color:var(--color-ink-subtle);">Brak działań pasujących do filtrów</td></tr>`;
         return;
     }
 
@@ -350,6 +372,18 @@ function renderItems(items) {
         const subtasks = it.subtask_count > 0
             ? `<a href="/timeline/${it.id}?from=items" class="subtask-chip" title="Otwórz oś czasu">${it.subtask_count}</a>`
             : `<span class="subtask-zero">0</span>`;
+        // %-completed: time-based progress (latest done-subtask finish vs. planned due date).
+        // Red theme flags an in-progress action that's already past its due date.
+        let completed;
+        if (it.percent_completed == null) {
+            completed = '<span class="pct-dash">—</span>';
+        } else {
+            const overdueRed = it.status === 'in_progress' && it.due_warning === 'overdue';
+            completed = `<div class="pct-cell">
+                <span class="pct-label">${it.percent_completed}%</span>
+                <div class="pct-bar${overdueRed ? ' pct-overdue' : ''}"><div class="pct-fill" style="width:${it.percent_completed}%;"></div></div>
+            </div>`;
+        }
         let actions = `<a href="/items/${it.id}" title="Szczegóły" style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:16px;">visibility</span></a>`;
         if (canManage) {
             actions += ` <a href="/items/${it.id}/edit" title="Edytuj" style="width:30px;height:30px;border:1px solid var(--color-border);border-radius:2px;background:#fff;color:var(--color-ink-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:16px;">edit</span></a>`;
@@ -362,6 +396,7 @@ function renderItems(items) {
             <td class="due-cell">${due}</td>
             <td style="color:var(--color-ink-muted);">${resp}</td>
             <td style="text-align:center;">${subtasks}</td>
+            <td>${completed}</td>
             <td style="text-align:right;white-space:nowrap;padding:.5rem .5rem;">${actions}</td>
         </tr>`;
     }).join('');

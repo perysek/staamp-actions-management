@@ -86,6 +86,33 @@ def _due_warning(due_date, earliest_start, created_at, status) -> str:
     return 'none'
 
 
+def _percent_completed(due_date, earliest_start, created_at, latest_done_finish, status) -> "int | None":
+    """Time-based progress shown in the '% ukończenia' column:
+
+      (latest done-subtask finish-date − start) / (planned finish-date − start) × 100
+
+    start = earliest subtask start_date, falling back to item creation date — the
+    same 'start' _due_warning() uses, so this progress ratio and the Termin warning
+    are measured against the same timeline.
+
+    A 'done' action is always 100%, regardless of subtask data (also covers the
+    case where it finished after the planned due date). Returns None — rendered as
+    '—' — when there's no planned due date or no completed subtask yet.
+    """
+    if status == 'done':
+        return 100
+    finish = _parse_ymd(due_date)
+    done_end = _parse_ymd(latest_done_finish)
+    if finish is None or done_end is None:
+        return None
+    start = _parse_ymd(earliest_start) or _parse_ymd(created_at)
+    span = (finish - start).days if start else 0
+    if span <= 0:
+        return 100 if done_end >= finish else 0
+    pct = (done_end - start).days / span * 100
+    return max(0, min(100, round(pct)))
+
+
 def _subtask_to_dict(row) -> dict:
     return {
         'id': row['id'],
@@ -179,6 +206,9 @@ def api_list():
         'subtask_count': r['subtask_count'], 'responsibles': r['responsibles'],
         'due_warning': _due_warning(r['due_date'], r['earliest_start'],
                                     r['created_at'], r['status']),
+        'percent_completed': _percent_completed(r['due_date'], r['earliest_start'],
+                                                r['created_at'], r['latest_done_finish'],
+                                                r['status']),
     } for r in rows]
     return jsonify({'items': items, 'count': len(items)})
 
